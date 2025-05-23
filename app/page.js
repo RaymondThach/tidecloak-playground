@@ -46,7 +46,7 @@ export default function Login() {
 
     const fetchConfig = async () => {
       try {
-        const res = await fetch("/api/tidecloak");
+        const res = await fetch("/api/tidecloakConfig");
         const data = await res.json();
 
         setKcData(data);
