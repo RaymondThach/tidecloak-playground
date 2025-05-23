@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import IAMService from "../../lib/IAMService";
+import settings from "/test-realm.json";
 
 // Create shared context
 const Context = createContext();
@@ -10,46 +11,41 @@ const Context = createContext();
  * Loads config and auth status and provides app-wide context.
  */
 export const Provider = ({ children }) => {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [contextLoading, setContextLoading] = useState(true);
-  const [baseURL, setBaseURL] = useState("");
-  const [realm, setRealm] = useState("");
+    const [authenticated, setAuthenticated] = useState(false);
+    const [contextLoading, setContextLoading] = useState(true);
+    const [baseURL, setBaseURL] = useState("");
+    const realm = settings.realm;
 
-  useEffect(() => {
-    const initContext = async () => {
-      try {
-        const [settingsRes, adapterRes] = await Promise.all([
-          fetch("/test-realm.json"),
-          fetch("/api/tidecloakConfig"),
-        ]);
 
-        const settings = await settingsRes.json();
-        const adapter = await adapterRes.json();
+    useEffect(() => {
+        const initContext = async () => {
+            try {
+                const adapterRes = await fetch("/api/tidecloakConfig");
+                const adapter = await adapterRes.json();
 
-        if (settings?.realm) setRealm(settings.realm);
-        if (adapter && Object.keys(adapter).length > 0 && adapter["auth-server-url"]) {
-          setBaseURL(adapter["auth-server-url"].replace(/\/$/, ""));
-        }
+                if (adapter && Object.keys(adapter).length > 0 && adapter["auth-server-url"]) {
+                    setBaseURL(adapter["auth-server-url"].replace(/\/$/, ""));
+                }
 
-        // Initialize IAM
-        IAMService.initIAM((auth) => {
-          setAuthenticated(auth);
-          setContextLoading(false);
-        });
-      } catch (err) {
-        console.error("Failed to initialize app context:", err);
-        setContextLoading(false);
-      }
-    };
+                // Initialize IAM
+                IAMService.initIAM((auth) => {
+                    setAuthenticated(auth);
+                    setContextLoading(false);
+                });
+            } catch (err) {
+                console.error("Failed to initialize app context:", err);
+                setContextLoading(false);
+            }
+        };
 
-    initContext();
-  }, []);
+        initContext();
+    }, []);
 
-  return (
-    <Context.Provider value={{ realm, baseURL, authenticated, contextLoading }}>
-      {children}
-    </Context.Provider>
-  );
+    return (
+        <Context.Provider value={{ realm, baseURL, authenticated, contextLoading }}>
+            {children}
+        </Context.Provider>
+    );
 };
 
 // Custom hook to access shared context
