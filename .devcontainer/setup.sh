@@ -28,8 +28,8 @@ docker run -d \
 echo "📦 Installing Node.js dependencies..."
 npm install
 
-echo "🏗️ Building Playground app..."
-#npm run build
+echo "🏗️ Building Next.js app..."
+npm run build
 
 echo ""
 echo "✅ Tidecloak Setup complete. You can close this terminal or continue below."

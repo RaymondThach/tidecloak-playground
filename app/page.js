@@ -1,9 +1,8 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from "react";
 import AccordionBox from "./components/accordionBox";
 import Button from "./components/button";
-import kcData from "/tidecloak.json";
 import { useAppContext } from "./context/context";
 import IAMService from "../lib/IAMService";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,24 +37,44 @@ export default function Login() {
   const [portIsPublic, setPortIsPublic] = useState(true);
   const [showLinkedTide, setShowLinkedTide] = useState(false);
 
+  // Invite URL to link Tide account to TideCloak
+  const [inviteURL, setInviteURL] = useState();
+  // Loaded adapter config
+  const [kcData, setKcData] = useState(null);
 
-  // Check authentication from context
+  // Fetch kcData on load and handle redirects
   useEffect(() => {
-    // Skip login screen if already logged in
+    // Skip login screen if already authenticated
     if (authenticated) {
       router.push("/auth/redirect");
-    }
-    else if (!authenticated && Object.keys(kcData).length === 0) {
-      // Show initialiser if tidecloak.json object is empty
-      setIsInitializing(true);
+      return;
     }
 
-    // Get the TideCloak address from the tidecloak.json file if its object is filled by TideCloak
-    if (kcData && Object.keys(kcData).length !== 0 && kcData["auth-server-url"]) {
-      setAdminAddress(kcData["auth-server-url"]);
-    }
-  }, [authenticated])
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch("/api/tidecloak");
+        const data = await res.json();
 
+        setKcData(data);
+
+        // Show initialiser if tidecloak.json object is empty
+        if (Object.keys(data).length === 0) {
+          setIsInitializing(true);
+        }
+
+        // Get the TideCloak address from the tidecloak.json file if its object is filled by TideCloak
+        if (data["auth-server-url"]) {
+          setAdminAddress(data["auth-server-url"]);
+        }
+      } catch (error) {
+        console.error("[Login] Failed to load config:", error);
+        setKcData({});
+        setIsInitializing(true);
+      }
+    };
+
+    fetchConfig();
+  }, [authenticated, router]);
 
   // Manage whether the token expired error should be shown using cached session data
   useEffect(() => {
@@ -132,8 +151,7 @@ export default function Login() {
     // Redirect to invite link to link Tide account when user has no VUID
     if (data.inviteURL) {
       router.push(data.inviteURL);
-    }
-    else {
+    } else {
       // Login if user has already linked Tide account (VUID exists)
       IAMService.doLogin();
     }
@@ -144,7 +162,7 @@ export default function Login() {
     return <LoadingPage isInitializing={isInitializing} setIsInitializing={setIsInitializing} />;
   }
 
-  return (
+    return (
     true
       ?
       <main className="flex-grow w-full pt-6 pb-16">
