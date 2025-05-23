@@ -3,11 +3,11 @@ import settings from "/test-realm.json";
 
 const envConfig = {
   BASEURL: process.env.BASE_URL ?? (() =>{
-    console.log("BASE_URL not set in .env, using default.");
+    console.info("BASE_URL not set in .env, using default.");
     return "http://localhost:8080";
   })(),
   CUSTOMURL: process.env.CUSTOM_URL ?? (() =>{
-    console.log("CUSTOM_URL not set in .env, using default.");
+    console.info("CUSTOM_URL not set in .env, using default.");
     return "http://localhost:3000";
   })()
 };

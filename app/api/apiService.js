@@ -7,20 +7,20 @@
 async function getMasterToken(baseURL) {
 
     const envConfig = {
-        USERNAME: process.env.KC_USERNAME ?? (() => {
-            console.log("KC_USERNAME not set in .env, using default.");
+        USERNAME: process.env.KC_USERNAME ?? (() =>{
+            console.info("KC_USERNAME not set in .env, using default.");
             return "admin";
         })(),
-        PASSWORD: process.env.KC_PASSWORD ?? (() => {
-            console.log("KC_PASSWORD not set in .env, using default.");
+        PASSWORD: process.env.KC_PASSWORD ?? (() =>{
+            console.info("KC_PASSWORD not set in .env, using default.");
             return "password";
         })(),
-        GRANTTYPE: process.env.GRANT_TYPE ?? (() => {
-            console.log("GRANT_TYPE not set in .env, using default.");
+        GRANTTYPE: process.env.GRANT_TYPE ?? (() =>{
+            console.info("GRANT_TYPE not set in .env, using default.");
             return "password";
         })(),
-        CLIENTID: process.env.CLIENT_ID ?? (() => {
-            console.log("CLIENT_ID not set in .env, using default.");
+        CLIENTID: process.env.CLIENT_ID ?? (() =>{
+            console.info("CLIENT_ID not set in .env, using default.");
             return "admin-cli";
         })()
     };
@@ -172,8 +172,6 @@ async function createUser(baseURL, realm, token, username, dob, cc) {
             "enabled": true
         })
     });
-
-    console.log(response);
 
     // Conflict case, but there should only be one user on initialisation.
     if (response.status === 409) {
@@ -596,9 +594,8 @@ async function toggleIGA(baseURL, realm, token) {
             "isIGAEnabled": true,
         })
     });
-    console.log(response);
-
-    if (!response.ok) {
+    
+    if (!response.ok){
         throw new Error("Failed to toggle IGA on.")
     }
 
