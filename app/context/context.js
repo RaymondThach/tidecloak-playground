@@ -20,7 +20,7 @@ export const Provider = ({ children }) => {
       try {
         const [settingsRes, adapterRes] = await Promise.all([
           fetch("/test-realm.json"),
-          fetch("/api/tidecloak"),
+          fetch("/api/tidecloakConfig"),
         ]);
 
         const settings = await settingsRes.json();
