@@ -1,44 +1,56 @@
-"use client"
+"use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-// Instead of tidecloak.json as writing to that configuration file rerenders the whole application.
-import settings from "/test-realm.json";
-import adapter from "/tidecloak.json";
 import IAMService from "../../lib/IAMService";
 
-// Create once, share, and  avoid creating on each rerender. 
+// Create shared context
 const Context = createContext();
 
-const realm = settings.realm;
-let baseURL = "";
-
-if (adapter && Object.keys(adapter).length > 0){
-    baseURL = adapter["auth-server-url"].replace(/\/$/, "");
-}
-
 /**
- * Updating baseURL and realm name for all pages and components is done here.
- * @param {JSX.Element} children - all other child components, so that they can access these values 
- * @returns {JSX.Element} - HTML, wrapped around everything in layout.js
+ * Loads config and auth status and provides app-wide context.
  */
 export const Provider = ({ children }) => {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [baseURL, setBaseURL] = useState("");
+  const [realm, setRealm] = useState("");
 
-    const [authenticated, setAuthenticated] = useState(false);
-    const [contextLoading, setContextLoading] = useState(true);
+  useEffect(() => {
+    const initContext = async () => {
+      try {
+        const [settingsRes, adapterRes] = await Promise.all([
+          fetch("/test-realm.json"),
+          fetch("/api/tidecloak"),
+        ]);
 
-    useEffect(() => {
+        const settings = await settingsRes.json();
+        const adapter = await adapterRes.json();
+
+        if (settings?.realm) setRealm(settings.realm);
+        if (adapter && Object.keys(adapter).length > 0 && adapter["auth-server-url"]) {
+          setBaseURL(adapter["auth-server-url"].replace(/\/$/, ""));
+        }
+
+        // Initialize IAM
         IAMService.initIAM((auth) => {
-            setAuthenticated(auth)
-            setContextLoading(false);
-          });
-    }, [])
+          setAuthenticated(auth);
+          setContextLoading(false);
+        });
+      } catch (err) {
+        console.error("Failed to initialize app context:", err);
+        setContextLoading(false);
+      }
+    };
 
-    return (
-        <Context.Provider value={{realm, baseURL, authenticated, contextLoading}}>
-            {children}
-        </Context.Provider>
-    )
-}
+    initContext();
+  }, []);
 
-// Custom hook to call shared values in components
+  return (
+    <Context.Provider value={{ realm, baseURL, authenticated, contextLoading }}>
+      {children}
+    </Context.Provider>
+  );
+};
+
+// Custom hook to access shared context
 export const useAppContext = () => useContext(Context);
