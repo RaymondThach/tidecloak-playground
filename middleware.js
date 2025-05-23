@@ -37,7 +37,7 @@ export async function middleware(req) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    const user = await verifyTideCloakToken(token, requiredRole);
+    const user = await verifyTideCloakToken(req, token, requiredRole);
     
     if (user) {
   	  return NextResponse.next();
