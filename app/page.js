@@ -36,9 +36,7 @@ export default function Login() {
 
   const [portIsPublic, setPortIsPublic] = useState(true);
   const [showLinkedTide, setShowLinkedTide] = useState(false);
-
-  // Invite URL to link Tide account to TideCloak
-  const [inviteURL, setInviteURL] = useState();
+  
   // Loaded adapter config
   const [kcData, setKcData] = useState(null);
 
@@ -153,7 +151,7 @@ export default function Login() {
       router.push(data.inviteURL);
     } else {
       // Login if user has already linked Tide account (VUID exists)
-      IAMService.doLogin();
+      await IAMService.doLogin();
     }
   };
 

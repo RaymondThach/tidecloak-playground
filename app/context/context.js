@@ -28,7 +28,7 @@ export const Provider = ({ children }) => {
                 }
 
                 // Initialize IAM
-                IAMService.initIAM((auth) => {
+                await IAMService.initIAM((auth) => {
                     setAuthenticated(auth);
                     setContextLoading(false);
                 });

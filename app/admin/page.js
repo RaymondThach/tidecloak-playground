@@ -16,7 +16,7 @@ import "../styles/spinner.css";
  * Admin page for elavating the demo user to a Tide admin and managing their read and write permissions for Date of Birth and Credit Card
  * @returns {JSX.Element} - HTML for the /admin path containing the permissions management via change requests
  */
-export default function Admin() { 
+export default async function Admin() { 
   // Current path
   const pathname = usePathname();
   // Navigator
@@ -153,11 +153,11 @@ export default function Admin() {
   // Get the current user realm roles to prefill the boxes and for updating the permissions
   const setUserPermissions = async () => { 
     if (loggedUser){
-      setHasDobReadPerm(IAMService.hasOneRole("_tide_dob.selfdecrypt"));
-      setHasDobWritePerm(IAMService.hasOneRole("_tide_dob.selfencrypt"));
+      setHasDobReadPerm(await IAMService.hasOneRole("_tide_dob.selfdecrypt"));
+      setHasDobWritePerm(await IAMService.hasOneRole("_tide_dob.selfencrypt"));
 
-      setHasCcReadPerm(IAMService.hasOneRole("_tide_cc.selfdecrypt"));
-      setHasCcWritePerm(IAMService.hasOneRole("_tide_cc.selfencrypt"));
+      setHasCcReadPerm(await IAMService.hasOneRole("_tide_cc.selfdecrypt"));
+      setHasCcWritePerm(await IAMService.hasOneRole("_tide_cc.selfencrypt"));
     }
   };
 
@@ -248,10 +248,10 @@ export default function Admin() {
     const rolesInfo = [dobReadRole, dobWriteRole, ccReadRole, ccWriteRole];
 
     for (let i = 0; i < checkBoxPerms.length; i++){
-      if (checkBoxPerms[i] && !IAMService.hasOneRole(roles[i])){      
+      if (checkBoxPerms[i] && !await IAMService.hasOneRole(roles[i])){      
         await appService.assignRealmRole(baseURL, realm, loggedUser.id, rolesInfo[i], token);
       }
-      else if (!checkBoxPerms[i] && IAMService.hasOneRole(roles[i])){
+      else if (!checkBoxPerms[i] && await IAMService.hasOneRole(roles[i])){
         await appService.unassignRealmRole(baseURL, realm, loggedUser.id, rolesInfo[i], token);
       }
     }
@@ -553,7 +553,7 @@ export default function Admin() {
     };
 
     return (
-      !loading && IAMService.isLoggedIn()
+      !loading && await IAMService.isLoggedIn()
       ?
       <main className="flex-grow w-full pt-6">
       {loadingOverlay && loadingSquareFullPage()}
