@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AccordionBox from "./components/accordionBox";
 import Button from "./components/button";
 import { useAppContext } from "./context/context";
@@ -49,55 +49,49 @@ export default function Login() {
   // Loaded adapter config
   const [kcData, setKcData] = useState(null);
 
-  const fetchConfig = async () => {
-  try {
-    const res = await fetch("/api/tidecloakConfig");
-    const data = await res.json();
+ const fetchConfig = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tidecloakConfig")
+      const data = await res.json()
 
-    // Show initialiser if tidecloak.json object is empty
-    if (Object.keys(data).length === 0) {
-      setIsInitializing(true);
-      return;
+      // no config yet → show initializer
+      if (!data || Object.keys(data).length === 0) {
+        setIsInitializing(true)
+        return null
+      }
+
+      // got valid config
+      if (data["auth-server-url"]) {
+        setAdminAddress(data["auth-server-url"])
+      }
+      setKcData(data)
+      return data
+
+    } catch (error) {
+      console.error("[Login] Failed to load config:", error)
+      setKcData(null)
+      setIsInitializing(true)
+      return null
     }
-    
-    // Get the TideCloak address from the tidecloak.json file if its object is filled by TideCloak
-    if (data["auth-server-url"]) {
-      setAdminAddress(data["auth-server-url"]);
-    }
-    setKcData(data);
-    return data;
+  }, [])
 
-  } catch (error) {
-    console.error("[Login] Failed to load config:", error);
-    setKcData(null);
-    setIsInitializing(true);
-  }
-};
 
-  // Fetch kcData on context load
   useEffect(() => {
-    // Fetch config if context already checks authentication
-    fetchConfig();
-  }, [authenticated]);
-
-  // When fetchConfig provides kcData handle redirect based on it
-  useEffect(() => {
-    if (kcData){
-      // Skip login screen if already authenticated
-      if (authenticated) {
-        router.push("/auth/redirect");
-      }
-      else if (!authenticated && Object.keys(kcData).length === 0) {
-        // Show initialiser if tidecloak.json object is empty
-        setIsInitializing(true);
-      }
-      
-      // Get the TideCloak address from the tidecloak.json file if its object is filled by TideCloak
-      if (kcData && Object.keys(kcData).length !== 0 && kcData["auth-server-url"]) {
-        setAdminAddress(kcData["auth-server-url"]);
-      }
+    // 1. If we haven’t even attempted to fetch yet, go fetch.
+    if (kcData === null) {
+      fetchConfig()
+      return
     }
-  }, [kcData])
+
+    // 2. If we do have a config object, and it's non-empty, and user is authed
+    if (
+      authenticated &&
+      kcData &&
+      Object.keys(kcData).length > 0
+    ) {
+      router.push("/auth/redirect")
+    }
+  }, [authenticated, kcData, fetchConfig, router])
 
 
   // Manage whether the token expired error should be shown using cached session data
