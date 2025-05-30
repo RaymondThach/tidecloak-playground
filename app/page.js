@@ -1,65 +1,31 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import AccordionBox from './components/accordionBox';
-import Button from './components/button';
-import LoadingPage from './components/LoadingPage';
-import EmailInvitation from './components/emailInvitation';
-import { LoadingSquareFullPage } from './components/loadingSquare';
+import { useAppContext } from "./context/context";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import AccordionBox from "./components/accordionBox";
+import Button from "./components/button";
+import LoadingPage from "./components/LoadingPage";
+import EmailInvitation from "./components/emailInvitation";
+import { LoadingSquareFullPage } from "./components/loadingSquare";
 import {
   FaExclamationCircle,
   FaChevronDown,
   FaCheckCircle,
-} from 'react-icons/fa';
-import { useAppContext } from './context/context';
-import IAMService from '../lib/IAMService';
-import appService from '../lib/appService';
+} from "react-icons/fa";
+import IAMService from "../lib/IAMService";
+import appService from "../lib/appService";
 
-/**
- * Hook: load TideCloak config and track initialization state.
- *
- * - kcData === undefined → still fetching
- * - kcData === {}        → empty config → show initializer
- * - kcData is object    → valid config → proceed
- */
-function useTideConfig(authenticated) {
-  const [kcData, setKcData] = useState(undefined);
+function useTideConfig(authenticated, tidecloakConfig, configLoading) {
   const [isInitializing, setIsInitializing] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchConfig() {
-      try {
-        const res = await fetch('/api/tidecloakConfig');
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (!data || Object.keys(data).length === 0) {
-          // Empty config → trigger initializer
-          setKcData({});
-          setIsInitializing(true);
-        } else {
-          // Got real config
-          setKcData(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[Login] Config load failed:', err);
-          setKcData({});
-          setIsInitializing(true);
-        }
-      }
+    if (!configLoading && tidecloakConfig && Object.keys(tidecloakConfig).length === 0) {
+      setIsInitializing(true);
     }
+  }, [configLoading, tidecloakConfig]);
 
-    fetchConfig();
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticated]);
-
-  return { kcData, isInitializing, setKcData, setIsInitializing };
+  return { isInitializing, setIsInitializing };
 }
 
 /**
@@ -69,12 +35,12 @@ function useTideConfig(authenticated) {
  */
 function useTideLink(baseURL) {
   const [isLinked, setIsLinked] = useState(true);
-  const [inviteLink, setInviteLink] = useState('');
+  const [inviteLink, setInviteLink] = useState("");
   const [showLinkedMsg, setShowLinkedMsg] = useState(false);
 
   const updateDomain = useCallback(async () => {
-    const res = await fetch('/api/updateCustomDomainURL');
-    if (!res.ok) throw new Error('Failed to update domain');
+    const res = await fetch("/api/updateCustomDomainURL");
+    if (!res.ok) throw new Error("Failed to update domain");
   }, []);
 
   useEffect(() => {
@@ -82,18 +48,24 @@ function useTideLink(baseURL) {
 
     async function checkLinkParams() {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('linkedTide') === 'true') {
+      if (params.get("linkedTide") === "true") {
         setShowLinkedMsg(true);
-        try { await updateDomain(); } catch {}
-        params.delete('linkedTide');
+        try {
+          await updateDomain();
+        } catch {}
+        params.delete("linkedTide");
         const qs = params.toString();
-        window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+        window.history.replaceState(
+          {},
+          "",
+          window.location.pathname + (qs ? `?${qs}` : "")
+        );
       }
     }
 
     async function fetchInvite() {
       try {
-        const res = await fetch('/api/inviteUser');
+        const res = await fetch("/api/inviteUser");
         const data = await res.json();
         if (cancelled) return;
         if (res.ok && data.inviteURL) {
@@ -103,7 +75,7 @@ function useTideLink(baseURL) {
           setIsLinked(true);
         }
       } catch (err) {
-        if (!cancelled) console.error('[Login] Invite fetch failed:', err);
+        if (!cancelled) console.error("[Login] Invite fetch failed:", err);
         setIsLinked(true);
       }
     }
@@ -123,10 +95,21 @@ function useTideLink(baseURL) {
 
 export default function Login() {
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, overlayLoading, setIsInitialized } = useAppContext();
+  const {
+    authenticated,
+    baseURL,
+    overlayLoading,
+    tidecloakConfig,
+    setTidecloakConfig,
+    configLoading
+  } = useAppContext();
 
   // Config and initialization hook
-  const { kcData, isInitializing, setKcData, setIsInitializing } = useTideConfig(authenticated);
+  const { isInitializing, setIsInitializing } = useTideConfig(
+    authenticated,
+    tidecloakConfig,
+    configLoading
+  );
 
   // Invite/link hook
   const { isLinked, inviteLink, showLinkedMsg } = useTideLink(baseURL);
@@ -142,17 +125,21 @@ export default function Login() {
 
   // Redirect once we have real config and are authenticated
   useEffect(() => {
-    if (kcData && Object.keys(kcData).length > 0 && authenticated) {
-      router.push('/auth/redirect');
+    if (
+      tidecloakConfig &&
+      Object.keys(tidecloakConfig).length > 0 &&
+      authenticated
+    ) {
+      router.push("/auth/redirect");
     }
-  }, [kcData, authenticated, router]);
+  }, [tidecloakConfig, authenticated, router]);
 
   // Token-expired banner and port check
   useEffect(() => {
-    if (sessionStorage.getItem('tokenExpired')) {
+    if (sessionStorage.getItem("tokenExpired")) {
       setShowError(true);
     }
-    if (baseURL && kcData && Object.keys(kcData).length > 0) {
+    if (baseURL && tidecloakConfig && Object.keys(tidecloakConfig).length > 0) {
       (async () => {
         try {
           const url = `${baseURL}/realms/master/.well-known/openid-configuration`;
@@ -163,14 +150,14 @@ export default function Login() {
         }
       })();
     }
-  }, [baseURL, kcData]);
+  }, [baseURL, tidecloakConfig]);
 
   // Login / link handler
   const handleLogin = async () => {
-    sessionStorage.removeItem('tokenExpired');
+    sessionStorage.removeItem("tokenExpired");
     setPortIsPublic(true);
     try {
-      const res = await fetch('/api/inviteUser');
+      const res = await fetch("/api/inviteUser");
       const data = await res.json();
       if (res.ok && data.inviteURL) {
         router.push(data.inviteURL);
@@ -178,81 +165,98 @@ export default function Login() {
         IAMService.doLogin();
       }
     } catch (err) {
-      console.error('[Login] handleLogin error:', err);
+      console.error("[Login] handleLogin error:", err);
     }
   };
 
   // ── EARLY RETURNS ──
 
-  // 1) Still fetching config
-  if (kcData === undefined) {
-    return <LoadingSquareFullPage />;
-  }
-
-  // 2) Config empty → show initializer (LoadingPage will call setIsInitialized)
+  // Config empty → show initializer (LoadingPage will call setIsInitialized)
   if (isInitializing) {
     return (
       <LoadingPage
         isInitializing={isInitializing}
         setIsInitializing={setIsInitializing}
-        setKcData={setKcData}
-        setIsInitialized={setIsInitialized}
+        setKcData={setTidecloakConfig}
       />
     );
   }
 
-  // 3) Demo user needs to link account
+  // Demo user needs to link account
   if (!isLinked && !overlayLoading) {
     return <EmailInvitation inviteLink={inviteLink} />;
   }
 
-  // 4) Context overlay still loading
+  // Context overlay still loading
   if (overlayLoading) {
+    console.log(isInitializing)
+    console.log(tidecloakConfig)
     return <LoadingSquareFullPage />;
   }
 
   // ── MAIN LOGIN UI ──
-  const adminAddress = kcData['auth-server-url'] || 'Need to setup backend first.';
+  const adminAddress =
+    tidecloakConfig["auth-server-url"] || "Need to setup backend first.";
 
   return (
     <main className="flex-grow w-full pt-6 pb-16">
       <div className="w-full px-8 max-w-screen-md mx-auto flex flex-col items-start gap-8">
         <div className="w-full max-w-3xl">
-          {pathname === '/' && (
+          {pathname === "/" && (
             <>
               {/* Explainer toggle */}
               <button
-                onClick={() => setShowLoginAccordion(x => !x)}
+                onClick={() => setShowLoginAccordion((x) => !x)}
                 className="absolute -top-2 right-0 text-2xl hover:scale-110 transition-transform"
                 aria-label="Toggle explainer"
               >
-                {showLoginAccordion ? '🤯' : '🤔'}
+                {showLoginAccordion ? "🤯" : "🤔"}
               </button>
 
-              <AccordionBox title="Why is this login special?" isOpen={showLoginAccordion}>
-                <p>This login showcases <strong>TideCloak's decentralized IAM model</strong>.</p>
-                <p>Admin powers are <strong>quorum-controlled</strong>, not unilateral.</p>
+              <AccordionBox
+                title="Why is this login special?"
+                isOpen={showLoginAccordion}
+              >
+                <p>
+                  This login showcases{" "}
+                  <strong>TideCloak's decentralized IAM model</strong>.
+                </p>
+                <p>
+                  Admin powers are <strong>quorum-controlled</strong>, not
+                  unilateral.
+                </p>
                 <p>No backdoors—provable security in action.</p>
               </AccordionBox>
 
               <div className="bg-blue-50 rounded shadow p-6 space-y-4">
-                <img src="/playground-logo_nav.png" alt="Logo" className="h-10 w-auto" />
+                <img
+                  src="/playground-logo_nav.png"
+                  alt="Logo"
+                  className="h-10 w-auto"
+                />
                 <h2 className="text-3xl font-bold">
                   Welcome to Play – a demo of provable security in action
                 </h2>
                 <p>
-                  Your admin is breached. IAM vendor compromised. Cloud host exposed.<br/>
-                  And still—no data leaks, no identities stolen, no access abused.<br/>
+                  Your admin is breached. IAM vendor compromised. Cloud host
+                  exposed.
+                  <br />
+                  And still—no data leaks, no identities stolen, no access
+                  abused.
+                  <br />
                   That's TideCloak. Build trust. Ship fast. Sleep easy.
                 </p>
                 <h3 className="text-xl font-semibold">Secure “BYOiD” Login</h3>
                 <p className="text-base">
-                  Log in like normal—your password is never stored, shared, or exposed.
+                  Log in like normal—your password is never stored, shared, or
+                  exposed.
                 </p>
                 <Button onClick={handleLogin} className="hover:bg-red-700">
                   Login
                 </Button>
-                <p className="text-sm italic text-gray-600 mt-3">Identity for your eyes only.</p>
+                <p className="text-sm italic text-gray-600 mt-3">
+                  Identity for your eyes only.
+                </p>
 
                 {showError && (
                   <div className="mt-2 flex items-center text-red-600 text-sm">
@@ -263,7 +267,9 @@ export default function Login() {
                 {portIsPublic === false && (
                   <div className="mt-2 flex items-center text-red-600 text-sm">
                     <FaExclamationCircle className="mr-1" />
-                    <span>TideCloak port is private—make it public to connect.</span>
+                    <span>
+                      TideCloak port is private—make it public to connect.
+                    </span>
                   </div>
                 )}
                 {showLinkedMsg && (
@@ -277,23 +283,28 @@ export default function Login() {
               {/* Backend details */}
               <div className="pl-6 mt-2">
                 <button
-                  onClick={() => setShowBackendDetails(x => !x)}
+                  onClick={() => setShowBackendDetails((x) => !x)}
                   className="flex items-center gap-2 text-gray-400 hover:text-gray-500 text-sm transition"
                 >
                   <span>View TideCloak Backend</span>
                   <FaChevronDown
                     className={`transform transition-transform duration-300 ${
-                      showBackendDetails ? 'rotate-180' : ''
+                      showBackendDetails ? "rotate-180" : ""
                     }`}
                   />
                 </button>
                 {showBackendDetails && (
                   <AccordionBox title="TideCloak Administration" isOpen>
-                    <p className="mb-4">Explore your fully-fledged IAM system’s admin console:</p>
+                    <p className="mb-4">
+                      Explore your fully-fledged IAM system’s admin console:
+                    </p>
                     <div className="border border-dashed border-gray-500 p-4">
                       <ul className="list-disc list-inside">
                         <li>
-                          Visit: <a href={adminAddress} className="text-blue-600">{adminAddress}</a>
+                          Visit:{" "}
+                          <a href={adminAddress} className="text-blue-600">
+                            {adminAddress}
+                          </a>
                         </li>
                         <li>Credentials: admin / password</li>
                       </ul>

@@ -10,7 +10,7 @@ import { useAppContext } from "../context/context";
  * @param {function} setOverlayLoading - turn on loading screen when completed to load back to login screen
  * @returns {JSX.Element} - HTML component for the initializer screen 
  */
-export default function LoadingPage({ isInitializing, setIsInitializing, setKcData, setIsInitialized }) {
+export default function LoadingPage({ isInitializing, setIsInitializing, setKcData }) {
 
     const [currentStep, setCurrentStep] = useState(0);
     const {setOverlayLoading} = useAppContext();
@@ -36,7 +36,7 @@ export default function LoadingPage({ isInitializing, setIsInitializing, setKcDa
                 console.log(error);
             }
         }
-    }, []);
+    }, [isInitializing]);
 
 
     // Create the demo realm using the settings provided in test-realm.json
@@ -220,9 +220,7 @@ export default function LoadingPage({ isInitializing, setIsInitializing, setKcDa
 
             // Load out of the initializer first then stop it to prevent Login screen appearing and giving context time to load 
             setOverlayLoading(true);
-            setIsInitializing(false);
-            setIsInitialized(true)
-            
+            setIsInitializing(false);            
         }
         catch (error) {
             // Delete IDP then realm if an error occurs in initialisation in preparation for restarting the process

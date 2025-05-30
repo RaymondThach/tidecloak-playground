@@ -14,7 +14,7 @@
   "portsAttributes": {
     "3000": {
       "label": "Playground App",
-      "onAutoForward": "openBrowser"
+      "onAutoForward": "notify"
 
     },
     "8080": {
