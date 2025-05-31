@@ -37,8 +37,7 @@ export async function middleware(req) {
       return NextResponse.redirect(new URL("/", req.url));
     }
 
-    const origin = process.env.SYSTEM_URL_OVERRIDE ?? req.nextUrl.origin
-    const user = await verifyTideCloakToken(origin, token, requiredRole);
+    const user = await verifyTideCloakToken(token, requiredRole);
     
     if (user) {
   	  return NextResponse.next();
