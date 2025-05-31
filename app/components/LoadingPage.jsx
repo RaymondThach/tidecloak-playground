@@ -10,7 +10,7 @@ import { useAppContext } from "../context/context";
  * @param {function} setOverlayLoading - turn on loading screen when completed to load back to login screen
  * @returns {JSX.Element} - HTML component for the initializer screen 
  */
-export default function LoadingPage({ isInitializing, setIsInitializing, setKcData }) {
+export default function LoadingPage({ isInitializing, setIsInitializing, setReInitialize }) {
 
     const [currentStep, setCurrentStep] = useState(0);
     const {setOverlayLoading} = useAppContext();
@@ -215,12 +215,13 @@ export default function LoadingPage({ isInitializing, setIsInitializing, setKcDa
             await uploadImages();
             await signSettings();
             await updateCustomDomainURL({linkedTide: true});
-            const data = await getAdapter();
-            setKcData(data);
+            await getAdapter();
 
-            // Load out of the initializer first then stop it to prevent Login screen appearing and giving context time to load 
+            // Load out of the initializer first then stop it to prevent Login screen appearing and giving context time to load
+            await IAMService.loadConfig();
             setOverlayLoading(true);
-            setIsInitializing(false);            
+            setIsInitializing(false);
+            setReInitialize(prev => prev + 1);
         }
         catch (error) {
             // Delete IDP then realm if an error occurs in initialisation in preparation for restarting the process

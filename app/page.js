@@ -16,23 +16,30 @@ import {
 import IAMService from "../lib/IAMService";
 import appService from "../lib/appService";
 
-function useTideConfig(authenticated, tidecloakConfig, configLoading) {
+function useTideConfig(authenticated) {
   const [isInitializing, setIsInitializing] = useState(false);
 
   useEffect(() => {
-    if (!configLoading && tidecloakConfig && Object.keys(tidecloakConfig).length === 0) {
-      setIsInitializing(true);
-    }
-  }, [configLoading, tidecloakConfig]);
+    if (authenticated) return; // no need to initialize if already logged in
+
+    const tryLoadConfig = async () => {
+      try {
+        const config = await IAMService.loadConfig();
+        const isEmpty = !config || Object.keys(config).length === 0;
+        if (isEmpty) {
+          setIsInitializing(true);
+        }
+      } catch (err) {
+        console.error("Failed to load config in useTideConfig:", err);
+        setIsInitializing(true); // fallback: assume we need to initialize
+      }
+    };
+
+    tryLoadConfig();
+  }, [authenticated]);
 
   return { isInitializing, setIsInitializing };
 }
-
-/**
- * Hook: demo invite/link flow.
- * - Detects ?linkedTide=true → shows success message
- * - Fetches /api/inviteUser to get invite URL or detect linked users
- */
 function useTideLink(baseURL) {
   const [isLinked, setIsLinked] = useState(true);
   const [inviteLink, setInviteLink] = useState("");
@@ -94,27 +101,16 @@ function useTideLink(baseURL) {
 }
 
 export default function Login() {
-  // App context (overlayLoading and re-init are handled in LoadingPage)
   const {
     authenticated,
     baseURL,
     overlayLoading,
-    tidecloakConfig,
-    setTidecloakConfig,
-    configLoading
+    setReInitialize,
   } = useAppContext();
 
-  // Config and initialization hook
-  const { isInitializing, setIsInitializing } = useTideConfig(
-    authenticated,
-    tidecloakConfig,
-    configLoading
-  );
-
-  // Invite/link hook
+  const { isInitializing, setIsInitializing } = useTideConfig(authenticated);
   const { isLinked, inviteLink, showLinkedMsg } = useTideLink(baseURL);
 
-  // Local UI state
   const [showLoginAccordion, setShowLoginAccordion] = useState(false);
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [showError, setShowError] = useState(false);
@@ -123,39 +119,36 @@ export default function Login() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Redirect once we have real config and are authenticated
   useEffect(() => {
-    if (
-      tidecloakConfig &&
-      Object.keys(tidecloakConfig).length > 0 &&
-      authenticated
-    ) {
+    if (authenticated && baseURL) {
       router.push("/auth/redirect");
     }
-  }, [tidecloakConfig, authenticated, router]);
+  }, [authenticated, baseURL, router]);
 
-  // Token-expired banner and port check
   useEffect(() => {
     if (sessionStorage.getItem("tokenExpired")) {
       setShowError(true);
     }
-    if (baseURL && tidecloakConfig && Object.keys(tidecloakConfig).length > 0) {
+
+    const config = IAMService._config;
+    const url = config?.["auth-server-url"];
+    if (url) {
       (async () => {
         try {
-          const url = `${baseURL}/realms/master/.well-known/openid-configuration`;
-          const res = await appService.checkPort(url);
+          const checkUrl = `${url}/realms/master/.well-known/openid-configuration`;
+          const res = await appService.checkPort(checkUrl);
           setPortIsPublic(res.ok);
         } catch {
           setPortIsPublic(false);
         }
       })();
     }
-  }, [baseURL, tidecloakConfig]);
+  }, [baseURL]);
 
-  // Login / link handler
   const handleLogin = async () => {
     sessionStorage.removeItem("tokenExpired");
     setPortIsPublic(true);
+
     try {
       const res = await fetch("/api/inviteUser");
       const data = await res.json();
@@ -170,33 +163,26 @@ export default function Login() {
   };
 
   // ── EARLY RETURNS ──
-
-  // Config empty → show initializer (LoadingPage will call setIsInitialized)
   if (isInitializing) {
     return (
       <LoadingPage
         isInitializing={isInitializing}
         setIsInitializing={setIsInitializing}
-        setKcData={setTidecloakConfig}
+        setReInitialize={setReInitialize}
       />
     );
   }
 
-  // Demo user needs to link account
   if (!isLinked && !overlayLoading) {
     return <EmailInvitation inviteLink={inviteLink} />;
   }
 
-  // Context overlay still loading
   if (overlayLoading) {
-    console.log(isInitializing)
-    console.log(tidecloakConfig)
     return <LoadingSquareFullPage />;
   }
 
-  // ── MAIN LOGIN UI ──
   const adminAddress =
-    tidecloakConfig["auth-server-url"] || "Need to setup backend first.";
+    IAMService._config?.["auth-server-url"] || "Need to setup backend first.";
 
   return (
     <main className="flex-grow w-full pt-6 pb-16">
@@ -204,7 +190,6 @@ export default function Login() {
         <div className="w-full max-w-3xl">
           {pathname === "/" && (
             <>
-              {/* Explainer toggle */}
               <button
                 onClick={() => setShowLoginAccordion((x) => !x)}
                 className="absolute -top-2 right-0 text-2xl hover:scale-110 transition-transform"
@@ -222,8 +207,7 @@ export default function Login() {
                   <strong>TideCloak's decentralized IAM model</strong>.
                 </p>
                 <p>
-                  Admin powers are <strong>quorum-controlled</strong>, not
-                  unilateral.
+                  Admin powers are <strong>quorum-controlled</strong>, not unilateral.
                 </p>
                 <p>No backdoors—provable security in action.</p>
               </AccordionBox>
@@ -243,11 +227,9 @@ export default function Login() {
                   <br />
                   And still—no data leaks, no identities stolen, no access
                   abused.
-                  <br />
-                  That's TideCloak. Build trust. Ship fast. Sleep easy.
                 </p>
                 <h3 className="text-xl font-semibold">Secure “BYOiD” Login</h3>
-                <p className="text-base">
+                <p>
                   Log in like normal—your password is never stored, shared, or
                   exposed.
                 </p>
@@ -280,7 +262,6 @@ export default function Login() {
                 )}
               </div>
 
-              {/* Backend details */}
               <div className="pl-6 mt-2">
                 <button
                   onClick={() => setShowBackendDetails((x) => !x)}
