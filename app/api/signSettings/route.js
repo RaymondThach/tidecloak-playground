@@ -1,6 +1,6 @@
 
 import configs from "../apiConfigs";
-import settings from "/test-realm.json";
+import settings from "../../../test-realm.json";
 import apiService from "../apiService";
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import settings from "/test-realm.json";
+import settings from "../../test-realm.json";
 import IAMService from "../../lib/IAMService";
 
 const Context = createContext();
