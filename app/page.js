@@ -20,6 +20,7 @@ function useTideConfig(authenticated) {
   const [isInitializing, setIsInitializing] = useState(false);
 
   useEffect(() => {
+    console.log("SASHA!!!")
     if (authenticated) return; // no need to initialize if already logged in
 
     const tryLoadConfig = async () => {
@@ -101,12 +102,16 @@ function useTideLink(baseURL) {
 }
 
 export default function Login() {
+
   const {
     authenticated,
     baseURL,
     overlayLoading,
     setReInitialize,
   } = useAppContext();
+
+  console.log("⚡ context:", useAppContext());
+
 
   const { isInitializing, setIsInitializing } = useTideConfig(authenticated);
   const { isLinked, inviteLink, showLinkedMsg } = useTideLink(baseURL);
