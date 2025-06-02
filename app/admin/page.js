@@ -1,765 +1,288 @@
-"use client"
-import { useState, useEffect, useRef } from "react";
-import IAMService from "../../lib/IAMService";
-import appService from "../../lib/appService";
-import { useAppContext } from "../context/context";
-import { Heimdall } from "../../tide-modules/heimdall";
-import AccordionBox from "../components/accordionBox";
-import Button from "../components/button";
-import { FaCheckCircle, FaChevronRight } from "react-icons/fa";
+'use client';
+
+import { useState, useEffect } from "react";
+import AccordionBox from "./components/accordionBox";
+import Button from "./components/button";
+import kcData from "/tidecloak.json";
+import { useAppContext } from "./context/context";
+import IAMService from "../lib/IAMService";
 import { usePathname, useRouter } from "next/navigation";
-import { LoadingSquareFullPage } from "../components/loadingSquare";
-import "../styles/spinKit.css";
-import "../styles/spinner.css";
+import {
+  FaExclamationCircle,
+  FaChevronDown,
+  FaCheckCircle
+} from "react-icons/fa";
+import LoadingPage from "./components/LoadingPage";
+import appService from "../lib/appService";
+import { loadingSquareFullPage } from "./components/loadingSquare";
+import EmailInvitation from "./components/emailInvitation";
 
 /**
- * Admin page for elavating the demo user to a Tide admin and managing their read and write permissions for Date of Birth and Credit Card
- * @returns {JSX.Element} - HTML for the /admin path containing the permissions management via change requests
+ * "/" path containing the Login page, logouts including token expiration is redirected here
+ * @returns {JSX.Element} - HTML rendering the "/" path containing login functionality, message on token expiration and TideCloak backend address
  */
-export default function Admin() { 
-  // Current path
+export default function Login() {
+  // Shared context data to check if already authenticated skip this login screen
+  const { authenticated, baseURL, overlayLoading, setOverlayLoading} = useAppContext();
+
+  // Current path "/"
   const pathname = usePathname();
-  // Navigator
+  // Navigation manager
   const router = useRouter();
-  // Shared context data
-  const { baseURL, realm, authenticated, contextLoading, overlayLoading } = useAppContext();
-  // Admin state of the logged in demo user
-  const [isTideAdmin, setIsTideAdmin] = useState(false);
-  // Object representation of the logged in user
-  const [loggedUser, setLoggedUser] = useState(null);
+  // Expandable extra information
+  const [showLoginAccordion, setShowLoginAccordion] = useState(false);
+  const [showBackendDetails, setShowBackendDetails] = useState(false);
+  // State for error message when token expires
+  const [showError, setShowError] = useState(false);
+  // TideCloak address
+  const [adminAddress, setAdminAddress] = useState("Need to setup backend first.");
+  // State to show initialiser when the tidecloak.json file has an empty object
+  const [isInitializing, setIsInitializing] = useState(false);
+  // State to show port status
+  const [portIsPublic, setPortIsPublic] = useState(false);
+  // State to show Tide account link status
+  const [showLinkedTide, setShowLinkedTide] = useState(false);
 
-  // Extra information
-  const [showAdminAccordion, setShowAdminAccordion] = useState(false);
-  const [showChangeInfo, setShowChangeInfo] = useState(false);
-  
-  // Current change request being managed
-  const [activeRequestIndex, setActiveRequestIndex] = useState(0);
-  // Current change request being opened
-  const [expandedIndex, setExpandedIndex] = useState(0);
-  
-  // Spinning loader and button manager
-  const [loadingButton, setLoadingButton] = useState(false);
+  // State to show the Tide email invitation componenty
+  const [isLinked, setIsLinked] = useState(true); 
 
-  // True when boxes don't match the token's roles
-  const [hasChanges, setHasChanges] = useState(false);
-  // All user change requests
-  const [requests, setRequests] = useState([]);
-  
-  // Extra information on what elevating a user to Tide Admin does
-  const [showExplainer, setShowExplainer] = useState(false);
-  
-  // This button only appears when logged in demo user doesn't have the  Tide Admin role yet
-  const handleElevateClick = () => setShowExplainer(true);
+  const [inviteLink, setInviteLink] = useState();
 
-  // Check Boxes
-  const [hasDobReadPerm, setHasDobReadPerm] = useState(false);
-  const [hasDobWritePerm, setHasDobWritePerm] = useState(false);
-  const [hasCcReadPerm, setHasCcReadPerm] = useState(false);
-  const [hasCcWritePerm, setHasCcWritePerm] = useState(false);
-
-  // User's input state to the change request
-  const [hasUserApproved, setHasUserApproved] = useState(false);
-  // State of active change request based on quorum
-  const [isApproved, setIsApproved] = useState(false);
-  // How many admins approved
-  const [totalApproved, setTotalApproved] = useState(1);
-  // Demo data to simulate admins approving the active change request
-  const ADMIN_NAMES = ["You", "Alice", "Ben", "Carlos", "Dana"];
-  // Current hasUserApproved state for each admin    
-  const [approvals, setApprovals] = useState([false, false, false, false, false]);
-  // Once approved, change requests becomes pending as it waits for other admins to approve to a total threshold (3 for this demo)
-  const [pending, setPending] = useState(false);
-
-  // State of whether the first QuorumDashBoard (card) has ran. Used to prevent too many animations, only 3 is needed.
-  const quorumDashRef  = useRef(false);
-
-  const [dobWriteRole, setDobWriteRole] = useState();
-  const [dobReadRole, setDobReadRole] = useState();
-  const [ccWriteRole, setCcWriteRole] = useState();
-  const [ccReadRole, setCcReadRole] = useState();
-
-  // Wait for context to load first when refreshing browser or similar destruction of context
+  // Check authentication from context
   useEffect(() => {
-    if (!contextLoading){
-      getRealmRoles();
+    // Skip login screen if already logged in
+    if (authenticated) {
+      router.push("/auth/redirect");
     }
-  }, [contextLoading])
+    else if (!authenticated && Object.keys(kcData).length === 0) {
+      // Show initialiser if tidecloak.json object is empty
+      setIsInitializing(true);
+    }
+    
+    // Get the TideCloak address from the tidecloak.json file if its object is filled by TideCloak
+    if (kcData && Object.keys(kcData).length !== 0 && kcData["auth-server-url"]) {
+      setAdminAddress(kcData["auth-server-url"]);
+    }
 
-  // For demo purposes, fetched stored or store data of admins who have approved locally
+  }, [authenticated]);
+
+
+  // Manage whether the token expired error should be shown using cached session data
   useEffect(() => {
-    const storedApprovals = localStorage.getItem("approvals");
-    // This is intended only for when refreshing browser, approvals[0] would be false then
-    if (isApproved && approvals[0] === false){
-      if (storedApprovals){
-        setApprovals(JSON.parse(storedApprovals));
-      }
-      else {
-        // Make up a new array of people who approved
-        let approvals = [true, false, false, false, false]
-        const others = [1, 2, 3, 4];
-        const shuffled = others.sort(() => 0.5 - Math.random()).slice(0, 2);
-        shuffled.forEach((index) => {
-          approvals[index] = true;
-        })
-        
-        setApprovals(approvals);
-      }
+    // Check the storage if a variable states that the token expired
+    const tokenExpired = sessionStorage.getItem("tokenExpired");
+    if (tokenExpired) {
+      setShowError(true);
     }
-  }, [isApproved])
 
-  // Run first
-  useEffect(() => {
-    if (authenticated){
-      getLoggedUser();
+    checkTideCloakPort();
+    checkTideLinkMsg();
+    checkTideLink();
+  }, [])
+
+  const checkTideLinkMsg = async () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('linkedTide') === 'true') {
+      setShowLinkedTide(true);
+      await updateCustomDomainURL()
+      params.delete('linkedTide');
+      const newQs = params.toString();
+      const newUrl = window.location.pathname + (newQs ? `?${newQs}` : '');
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [authenticated])
-
-  // Then get the currently assigned realm roles of the logged in user after they've been identified 
-  useEffect(() => {
-    if (loggedUser){ 
-      checkAdminRole();  
-    }
-  }, [loggedUser])
-
-  // Then check if they're a Tide Admin to decide which components to render 
-  useEffect(() => {
-      // Shouldn't need to get permissions if logged in user isn't an Admin; will need to elevate instead
-      if (isTideAdmin){
-        setUserPermissions();
-        if (isTideAdmin){
-          getChangeRequests(); // Get existing requests to cancel them
-        }
-      }
-  }, [isTideAdmin])
-
-  // Get current logged in user
-  const getLoggedUser = async () => { 
-    const token = await IAMService.getToken();
-    const loggedVuid =  IAMService.getValueFromToken("vuid");
-    const users = appService.getUsers(baseURL, realm, token);
-    const loggedInUser = users.find(user => {
-      if (user.attributes.vuid[0] === loggedVuid){
-          return user;
-      }
-    });
-    setLoggedUser(loggedInUser);
-  };
-  
-  // Get the current user realm roles to prefill the boxes and for updating the permissions
-  const setUserPermissions = async () => { 
-    if (loggedUser){
-      setHasDobReadPerm(IAMService.hasOneRole("_tide_dob.selfdecrypt"));
-      setHasDobWritePerm(IAMService.hasOneRole("_tide_dob.selfencrypt"));
-
-      setHasCcReadPerm(IAMService.hasOneRole("_tide_cc.selfdecrypt"));
-      setHasCcWritePerm(IAMService.hasOneRole("_tide_cc.selfencrypt"));
-    }
-  };
-
-  // On initial render check if logged user is admin to decide which components to show
-  const checkAdminRole = async () => {
-      const token = await IAMService.getToken();
-      // Get Realm Management default client's ID
-      const clientID = appService.getRealmManagementId(baseURL, realm, token);
-      // Check if user already has the role
-      setIsTideAdmin(appService.checkUserAdminRole(baseURL, realm, loggedUser.id, clientID, token));
   }
 
-  // Assign this initial user the tide-realm-admin client role managed by the default client Realm Management
-  const confirmAdmin = async () => {
-    setLoadingButton(true);
-    const token = await IAMService.getToken();
+  // Every time Login page is visited, check if the demo account has been linked
+  // for this demo's purpose
+  const checkTideLink = async () => {
+    // Generate invite link
+    const response = await fetch(`/api/inviteUser`, {
+      method: "GET",
+    })
 
-    if (!isTideAdmin){
-        const RMClientID = appService.getRealmManagementId(baseURL, realm, token);
+    if (!response.ok) {
+      const errorResponse = await response.json();
+      throw new Error(errorResponse.error || "Failed generate Tide invite link.");
+    }
 
-        // Get the tide-realm-admin role to assign
-        const tideAdminRole = await appService.getTideAdminRole(baseURL, realm, loggedUser.id, RMClientID, token);
+    const data = await response.json();
 
-        // Assign the tide-realm-admin role to the logged in user
-        const assignResponse = await appService.assignClientRole(baseURL, realm, loggedUser.id, RMClientID, tideAdminRole, token);
-
-        // Back end functionality required to approve and commit user with tide-realm-admin role using a master token
-        const response = await fetch(`/api/commitAdminRole`);
-
-        if (response.ok) {
-            // Force update of token without logging out
-           
-            await IAMService.updateToken();
-            setIsTideAdmin(true); 
-           
-            console.log("Admin Role Assigned");
-        }
+    // Redirect to invite link to link Tide account when user has no VUID
+    if (data.inviteURL) {
+      setInviteLink(data.inviteURL);
+      setIsLinked(false);
     }
     else {
-        setIsTideAdmin(true);
+      // Login if user has already linked Tide account (VUID exists)
+      setIsLinked(true);
     }
-    setLoadingButton(false);
+  }
+
+  // Update the Custom Domain URL for the Tide Enclave to work
+  const updateCustomDomainURL = async () => {
+    const response = await fetch("/api/updateCustomDomainURL", { method: 'GET' });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to update domain URL');
+    }
+    return response;
   };
 
-  // Get latest change requests to display and update when pressing commit
-  const getChangeRequests = async () => {
+  // Can't connect to TideCloak if the ports are not public
+  // It's public if there's an Ok response
+  const checkTideCloakPort = async () => {
     
-    const token = await IAMService.getToken();
-    const changeRequests = appService.getUserRequests(baseURL, realm, token);
-    // Remove Denied Requests
-    const withoutDeniedReqs = changeRequests.filter((request) => 
-      (request.deleteStatus !== "DENIED" && request.status !== "DENIED")
-    )
-    setRequests(withoutDeniedReqs);
-  }
+    const url = `${baseURL}/realms/master/.well-known/openid-configuration`;
 
-  // Fetch all realm role objects to assign to user based on check box states
-  const getRealmRoles = async () => {
-    const token = await IAMService.getToken();
-    setDobWriteRole(await appService.getRealmRole(baseURL, realm, "_tide_dob.selfencrypt", token));
-    setDobReadRole(await appService.getRealmRole(baseURL, realm, "_tide_dob.selfdecrypt", token));
-    setCcReadRole(await appService.getRealmRole(baseURL, realm, "_tide_cc.selfdecrypt", token));
-    setCcWriteRole(await appService.getRealmRole(baseURL, realm, "_tide_cc.selfencrypt", token));
-  }
+    try {
+      // Only ping this endpoint if initialisation has already happened
+      // Else the endpoint doesn't exist, because realm doesn't. 
+      if (Object.keys(kcData).length !== 0){
+        const response = await appService.checkPort(url);
 
-  /**
-   * Assign or unassign the logged in user realm roles (pemissions)
-   * @param {*} e - the form's event, when Submit Changes button is clicked
-   */
-  const handleAdminPermissionSubmit = async (e) => {
-    e.preventDefault();
-
-    const token = await IAMService.getToken();
-
-    // Clear cached data of the demo admins who have approved for a reset
-    localStorage.removeItem("approvals");
-
-    // Get all then cancel all requests before assigning new ones
-    const allRequests = appService.getUserRequests(baseURL, realm, token); // Including the denied requests
-    await cancelRequests(allRequests);
-  
-    // Compare the current checkbox state with the current permissions. Note: token roles only update when a role change request commits.
-    // If the states don't match, a change request is required and made.
-    const checkBoxPerms = [hasDobReadPerm, hasDobWritePerm, hasCcReadPerm, hasCcWritePerm];
-    const roles = ["_tide_dob.selfdecrypt", "_tide_dob.selfencrypt", "_tide_cc.selfdecrypt", "_tide_cc.selfencrypt"];
-    const rolesInfo = [dobReadRole, dobWriteRole, ccReadRole, ccWriteRole];
-
-    for (let i = 0; i < checkBoxPerms.length; i++){
-      if (checkBoxPerms[i] && !IAMService.hasOneRole(roles[i])){      
-        await appService.assignRealmRole(baseURL, realm, loggedUser.id, rolesInfo[i], token);
+        if (response.ok) {
+          setPortIsPublic(true);
+          console.log("TideCloak port is public.");
+          
+        }
+        else {
+          throw new Error("TideCloak port is private, please change to public to allow connections.");
+        }
       }
-      else if (!checkBoxPerms[i] && IAMService.hasOneRole(roles[i])){
-        await appService.unassignRealmRole(baseURL, realm, loggedUser.id, rolesInfo[i], token);
+      else {
+        throw new Error("Need to initialize realm first. Starting initializer.")
       }
+    } catch (error){
+      setPortIsPublic(false);
+      console.log(error);
+      
     }
+  };
 
-    // Get the latest change requests
-    const newRequests = appService.getUserRequests(baseURL, realm, token);
-    setRequests(newRequests);
 
-    // Set first change request as the one currently opened
-    setActiveRequestIndex(0);
-    setExpandedIndex(0);
-    // Reset form state
-    setHasChanges(false);
+  // Redirect to Tide Enclave to sign in or link Tide account based on existence of user's VUID checked on backend to make inviteURL.
+  const handleLogin = async () => {
+    // If previously logged in remove this session variable.
+    sessionStorage.removeItem("tokenExpired");
+    // Turn off the message if TideCloak port wasn't public before
+    setPortIsPublic(true);
+
+    IAMService.doLogin();
+  };
+
+  // Show the initialiser
+  if (isInitializing) {
+    return <LoadingPage isInitializing={isInitializing} setIsInitializing={setIsInitializing} setOverlayLoading={setOverlayLoading} setIsLinked={setIsLinked}/>;
   }
 
-  /**
-   * Each is a card the represents the change request, its status, action, admins approved and user's action button
-   * @param {Object} request - representation of the change request
-   * @param {Function} onCommit - when the commit button is clicked run addCommit() for that change request
-   * @returns {JSX.Element} - HTML of the card representation 
-   */
-  function QuorumDashboard({ request, onCommit }) {
-      // Current request's status to be displayed
-      let requestStatus;
-
-      // The status can be represented by either deleteStatus or status fields of the change request object
-      if (request.deleteStatus){
-        requestStatus = request.deleteStatus;
-      }
-      else { 
-        requestStatus = request.status;
-      }
-    
-      // When committed
-      if (requestStatus === "COMMITTED" && requests.length === activeRequestIndex + 1 ) {
-        return (
-          <div className="bg-white border rounded-lg p-6 shadow space-y-4 mt-8">
-
-          <div className="mt-4">
-            <div className="text-sm text-gray-700 flex items-center gap-2">
-              <FaCheckCircle className="text-green-500" />
-              <span>Done! You can now explore the updated permissions.</span>
-              <a
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  router.push("/user");
-                }}
-                className="text-blue-600 hover:underline font-medium whitespace-nowrap"
-              >
-                View on User Page →
-              </a>
-            </div>
-          </div>
-  
-        </div>
-        );
-      }
-      
-      // Perform approval checks and commit checks everytime requests is updated from the enclave actions
-      useEffect(() => {
-        // Based on the status of the change request, trigger useEffect to update the current approvals on refresh
-        if (requestStatus === "APPROVED"){
-          setIsApproved(true);
-        }
-
-        // When Approving (Animation)
-        if (hasUserApproved && quorumDashRef.current === false){
-          quorumDashRef.current = true;
-          
-          const others = [1, 2, 3, 4];
-          const shuffled = others.sort(() => 0.5 - Math.random()).slice(0, 2);
-          let completed = 0;
-
-          // Temporary array to update currently approved users for a change request and store locally
-          const updated = [...approvals];
-          shuffled.forEach((index, i) => {
-            setTimeout(async() => {
-              updated[index] = true;
-              setApprovals([...updated]);
-
-              // Update the UI's counter for number of people approved
-              setTotalApproved(prev => prev + 1);
-            
-              // To break out of animation loop after the last animation and change status from PENDING
-              completed++;
-              if (completed === shuffled.length){
-                setPending(false);
-                setHasUserApproved(false);
-                // Change the button to a Commit button based on the new status
-                requestStatus = requests[activeRequestIndex].deleteStatus ? requests[activeRequestIndex].deleteStatus : requests[activeRequestIndex].status;
-                // Allow next change request card to be used
-                quorumDashRef.current = false;
-                // Store locally for persistence through browser refresh
-                localStorage.setItem("approvals", JSON.stringify(updated));
-                  
-              }
-            }, (i + 1) * 900);
-          });  
-        }
-      }, [hasUserApproved])
-    
-      // POST /tideAdminResources/add-rejection
-      // Add denied status to change request 
-      const addRejection = async (action, draftId, type) => {
-        const token = await IAMService.getToken();    
-        
-        // Key value pairs
-        const formData = new FormData();
-        formData.append("actionType", action);
-        formData.append("changeSetId", draftId);
-        formData.append("changeSetType", type);
-  
-        const response = await appService.denyEnclave(baseURL, realm, formData, token);
-        if (response.ok){
-          setRequests(appService.getUserRequests(baseURL, realm, token));
-          setHasUserApproved(false);
-          setActiveRequestIndex(prev => prev + 1);
-          setExpandedIndex(prev => prev + 1);
-        } 
-      };
-  
-      // POST /tideAdminResources/add-authorization
-      // Add approve status to change request
-      const addApproval = async (action, draftId, type, authorizerApproval, authorizerAuthentication) => {
-        const token = await IAMService.getToken();
-
-        // Key value pairs
-        const formData = new FormData();
-        formData.append("actionType", action);
-        formData.append("changeSetId", draftId);
-        formData.append("changeSetType", type);
-        formData.append("authorizerApproval", authorizerApproval);
-        formData.append("authorizerAuthentication", authorizerAuthentication);
-    
-        const response = await appService.approveEnclave(baseURL, realm, formData, token);
-
-        if (response.ok){
-          // TideCloak keeps approved change requests so fetch new one and replace
-          const updatedChangeReqs = appService.getUserRequests(baseURL, realm, token);
-          
-          const updatedChangeReq = updatedChangeReqs.find(req => req.draftRecordId === draftId);
-          requests[activeRequestIndex] = updatedChangeReq; 
-        
-          setApprovals([true, false, false, false, false]);
-          setPending(true);
-          setHasUserApproved(true);
-        }
-        
-      };
-
-        
-      // When user presses Review button to show the Tide Enclave popup
-      const handleUserApprove = async (changeRequest) => {
-        const token = await IAMService.getToken();
-        // Get popup data for the change request to know that it requires the enclave and pass data to the popup
-        const response = await appService.reviewChangeRequest(baseURL, realm, changeRequest, token);
-        const popupData = await response.json();
-    
-        if (popupData.requiresApprovalPopup === "true") {
-          const vuid = IAMService.getValueFromToken("vuid");
-          const heimdall = new Heimdall(popupData.customDomainUri, [vuid]);
-          await heimdall.openEnclave();
-        
-          // Waiting user response for auth approval
-          const authorizerApproval = await heimdall.getAuthorizerApproval(popupData.changeSetRequests, "UserContext:1", popupData.expiry, "base64url");
-          
-          // If Deny is clicked
-          if (authorizerApproval.accepted === false) {
-            addRejection(changeRequest.actionType, changeRequest.draftRecordId, changeRequest.changeSetType);
-            heimdall.closeEnclave(); 
-          } else if (authorizerApproval.accepted === true) { // If Approve is clicked
-            const authorizerAuthentication = await heimdall.getAuthorizerAuthentication();
-            addApproval(changeRequest.actionType, changeRequest.draftRecordId, changeRequest.changeSetType, authorizerApproval.data, authorizerAuthentication);
-            heimdall.closeEnclave();
-           
-          }
-        };
-      };
-
-      return (
-        <div className="bg-white border rounded-lg p-6 shadow space-y-4 mt-8">
-
-        <div className="flex justify-between items-center mt-6">
-          {ADMIN_NAMES.map((name, idx) => (
-            <div key={idx} className="relative flex flex-col items-center">
-              <div
-                className={`w-14 h-14 flex items-center justify-center rounded-full border-4 transition-all duration-700 ease-in-out 
-          ${approvals[idx] ? "border-green-500 shadow-md shadow-green-200" : "border-gray-300"}
-        `}
-              >
-                <span className="font-semibold text-lg text-gray-700">{name[0]}</span>
-              </div>
-              <span className="text-xs mt-2 text-gray-600">{name}</span>
-
-              {/* Tick overlay – doesn't shift layout */}
-              {approvals[idx] && (
-                <FaCheckCircle className="absolute top-0 right-0 text-green-500 w-4 h-4 transition-opacity duration-500 translate-x-2 -translate-y-2" />
-              )}
-            </div>
-          ))}
-
-        </div>
-
-        <div className="pt-4">
-          { request.deleteStatus === "DRAFT" || request.status === "DRAFT"? (
-            <Button className="hover:bg-red-700" onClick={() => {handleUserApprove(request)}} disabled={pending}>
-              Review
-            </Button>
-
-          ) : !pending && (request.deleteStatus === "APPROVED" || request.status === "APPROVED") ? (
-            <div className="flex items-center gap-x-2">
-              <Button className="bg-green-600 hover:bg-green-700" onClick={onCommit} disabled={loadingButton}>
-                Commit
-              </Button>
-              {
-                loadingButton 
-                ? <div className="spinner--left"/>
-                : null
-              }
-            </div>
-            
-          ) : (
-            <p className="text-sm text-gray-500 italic">
-              Awaiting quorum: <strong>{totalApproved} / 3</strong> approved
-            </p>
-          )}
-        </div>
-
-      </div >
-    );
+  // Show Email Invitation Page if demo user not linked to a Tide account after Initialization
+  if (!isLinked && !overlayLoading) {
+    return <EmailInvitation inviteLink={inviteLink}/>;
   }
 
-  const addCommit = async (request) => {
-      setLoadingButton(true);
-      
-      try{
-
-        const token = await IAMService.getToken();
-
-        const body = JSON.stringify({
-          "actionType": request.actionType,
-          "changeSetId": request.draftRecordId,
-          "changeSetType": request.changeSetType
-        });
-        
-        const response = await appService.commitChange(baseURL, realm, body, token);
-        
-        if (response.ok){
-          // Hard code the change, because keycloak removes committed change requests
-          if (requests[activeRequestIndex].deleteStatus){
-            requests[activeRequestIndex].deleteStatus = "COMMITTED";
-          }
-          else {
-            requests[activeRequestIndex].status = "COMMITTED";
-          }
-
-          // Clear the locally stored approved users array
-          localStorage.removeItem("approvals");
-          
-          // Get a new token to have check the currently assigned roles to the logged in user
-          await IAMService.updateToken();
-
-          
-          // Reset states for next change request
-          setApprovals([false, false, false, false, false]);
-          setTotalApproved(1);
-          if (requests.length !== activeRequestIndex + 1 ){
-            setActiveRequestIndex(prev => prev + 1);
-            setExpandedIndex(prev => prev + 1);
-          }
-        }
-        
-        setLoadingButton(false);
-      }catch(e){
-    
-        setLoadingButton(false);
-        throw e;
-      }
-    };
-
-    // If submit button is pressed again, cancel all the change requests
-    const cancelRequests = async (requests) => {
-      const token = await IAMService.getToken();
-        
-      for (let i = 0; i < requests.length; i++) {
-          const request = requests[i];
-          
-          const body = JSON.stringify({
-            actionType: request.actionType,
-            changeSetId: request.draftRecordId,
-            changeSetType: request.changeSetType
-          });
-
-        const response = await appService.cancelChange(baseURL, realm, body, token);
-      }
-    };
-
-    return (
-      !overlayLoading
+  return (
+    !overlayLoading && isLinked
       ?
-      <main className="flex-grow w-full pt-6">
-      <div className="w-full px-8 max-w-screen-md mx-auto flex flex-col items-start gap-8">
-      <div className="w-full max-w-3xl">
-        {pathname === "/admin" && (
-            <div key="admin" className="space-y-6 relative">
+      <main className="flex-grow w-full pt-6 pb-16">
 
-              {/* Accordion Icon */}
-              <button
-                onClick={() => setShowAdminAccordion(prev => !prev)}
-                className="absolute -top-2 right-0 text-2xl hover:scale-110 transition-transform"
-                aria-label="Toggle explanation"
-              >
-                {showAdminAccordion ? "🤯" : "🤔"}
-              </button>
+        <div className="w-full px-8 max-w-screen-md mx-auto flex flex-col items-start gap-8">
+          <div className="w-full max-w-3xl">
+            {pathname === "/" && (
+              <div key="user" className="space-y-4 relative pb-32 md:pb-40">
 
-              {/* Accordion Content */}
-              <AccordionBox title="What makes TideCloak special?" isOpen={showAdminAccordion}>
-                <ul className="list-disc list-inside">
-                  <li><strong>Decentralized quorum-based approval</strong></li>
-                  <li>Immutable audit logs</li>
-                  <li>Granular control over sensitive fields</li>
-                </ul>
-                <p>
-                  So you don't worry about{" "}
-                  <a href="#" className="text-blue-600 underline">permission sprawl</a>,{" "}
-                  <a href="#" className="text-blue-600 underline">forgotten admin accounts</a>, or{" "}
-                  <a href="#" className="text-blue-600 underline">over-permissioned users</a>.
-                </p>
-              </AccordionBox>
+                {/* Accordion Toggle for Landing Page */}
+                <button
+                  onClick={() => setShowLoginAccordion(prev => !prev)}
+                  className="absolute -top-2 right-0 text-2xl hover:scale-110 transition-transform"
+                  aria-label="Toggle explainer"
+                >
+                  {showLoginAccordion ? "🤯" : "🤔"}
+                </button>
 
-
-
-              {!isTideAdmin && (
-                <div className="space-y-4">
-                  <h2 className="text-3xl font-bold mb-4">Administration</h2>
-                  <p className="text-sm text-gray-600 mb-6">This page demonstrates how user privileges can be managed in App, and how the app is uniquely protected against a compromised admin.</p>
-                  {!showExplainer ? (
-                    <Button className="hover:bg-red-700" onClick={handleElevateClick}>Elevate to Admin Role</Button>
-                  ) : (
-                    <div className="bg-yellow-50 border border-yellow-300 p-4 rounded space-y-3">
-                      <p className="font-semibold text-yellow-800">"Yeah, but doesn't the fact you can do this undermine the whole 'quorum-enforced' thing?"</p>
-                      <p className="text-sm text-yellow-900">
-                        Can't get anything past you! This ability highlights the usual flaw in IAM systems — that the system itself can assign powers at will.
-                        With TideCloak, once hardened with a quorum, even the system can't unilaterally grant admin rights.
-                        <br /><br /><strong>For this demo, you're a quorum of one.</strong>
-                      </p>
-                      <div className="flex items-center gap-x-4">
-                        <Button className="hover:bg-red-700" onClick={confirmAdmin} disabled={loadingButton}>Continue as Admin</Button>
-                        {
-                          loadingButton
-                          ? <div className="spinner--left"/>
-                          : null
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {isTideAdmin && (
-                <div className="space-y-6">
-                  <h2 className="text-3xl font-bold mb-4">Administration</h2>
-                  <p className="text-sm text-gray-700">
-                    Change your permissions to demo the quorum-enforced workflow for change requests, then check out how the permission changes affect the User experience on the User page.
+                {/* Accordion Content */}
+                <AccordionBox title="Why is this login special?" isOpen={showLoginAccordion}>
+                  <p>
+                    This login page showcases <strong>TideCloak's decentralized IAM model</strong>.
                   </p>
-                  <form
-                    onSubmit={handleAdminPermissionSubmit}
-                    onChange={() => setHasChanges(true)}
-                    className="space-y-6"
-                  >
-                    <div className="border rounded-lg p-6 bg-white shadow-sm space-y-6">
-                      <h4 className="text-xl font-bold text-gray-800">User Permissions</h4>
+                  <p>
+                    Admin powers, even login elevation, are <strong>quorum-controlled</strong> — not granted unilaterally.
+                  </p>
+                  <p>
+                    The system itself has no backdoor. That’s the point.
+                  </p>
+                </AccordionBox>
 
-                      {/* Date of Birth */}
-                      <div>
-                        <label className="block font-semibold text-sm mb-1">Date of Birth</label>
-                        <div className="flex gap-6">
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" name="dob.read" checked={hasDobReadPerm} onChange={e => setHasDobReadPerm(e.target.checked)}/>
-                            <span>Read</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" name="dob.write" checked={hasDobWritePerm} onChange={e => setHasDobWritePerm(e.target.checked)}/>
-                            <span>Write</span>
-                          </label>
-                        </div>
+                <div className="bg-blue-50 rounded shadow p-6 space-y-4">
+                  <img
+            src="/playground-logo_nav.png"
+            alt="Playground Logo"
+            className="h-10 w-auto"
+          />
+                  <h2 className="text-3xl font-bold">Welcome to your demo app</h2>
+                  <p>Traditional IAM is only as secure as the admins and systems managing it. TideCloak fundamentally removes this risk, by ensuring no-one holds the keys to the kingdom. Explore to learn how.</p>
+                  <h3 className="text-xl font-semibold">BYOiD</h3>
+                  <p className="text-base">Login or create an account to see the user experience demo.</p>
+                  <Button onClick={handleLogin}>Login</Button>
+                  {
+                    showError
+                      ?
+                      <div className="mt-2 flex items-center text-red-600 text-sm">
+                        <FaExclamationCircle className="mr-1" />
+                        <span>Your session has expired. Please login again.</span>
                       </div>
-
-                      {/* Credit Card Number */}
-                      <div>
-                        <label className="block font-semibold text-sm mb-1">Credit Card Number</label>
-                        <div className="flex gap-6">
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" name="cc.read" checked={hasCcReadPerm} onChange={e => setHasCcReadPerm(e.target.checked)}/>
-                            <span>Read</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input type="checkbox" name="cc.write" checked={hasCcWritePerm} onChange={e => setHasCcWritePerm(e.target.checked)}/>
-                            <span>Write</span>
-                          </label>
-                        </div>
+                      : null
+                  }
+                  {
+                    !portIsPublic
+                      ?
+                      <div className="mt-2 flex items-center text-red-600 text-sm">
+                        <FaExclamationCircle className="mr-1" />
+                        <span>TideCloak port is private, make it public to allow connections.</span>
                       </div>
+                    : null
+                  }             
+                  {/* just linked Tide */}
+                  {showLinkedTide && (
+                    <div className="mt-2 flex items-center text-green-600 text-sm">
+                      <FaCheckCircle className="mr-1" />
+                      <span>You have successfully linked your Tide account! Please login.</span>
                     </div>
-
-                    <Button className="hover:bg-red-700" type="submit" disabled={!hasChanges}>Submit Changes</Button>
-                  </form>
-
-                  {requests[0] && (
-                    <>
-                      {/* Sub-heading + info toggle */}
-                      <div className="relative mb-2">
-                        <h3 className="text-xl font-semibold">Change Requests</h3>
-                        <button
-                          onClick={() => setShowChangeInfo(prev => !prev)}
-                          className="absolute -top-2 right-0 text-2xl hover:scale-110 transition-transform"
-                          aria-label="Toggle change-request info"
-                        >
-                          {showChangeInfo ? "🤯" : "🤔"}
-                        </button>
-                      </div>
-
-                      {showChangeInfo && (
-                        <AccordionBox title="Quorum-enforced permission changes" isOpen>
-                          <p className="text-sm text-gray-600">
-                            Each individual permission change must be reviewed and committed in turn. Click "Review" to open the full approval workflow.
-                          </p>
-                        </AccordionBox>
-                      )}
-                      <div className="space-y-4">
-
-                        {/* each draft as row */}
-                        {requests.map((req, idx, i) => {
-                          const isActive = idx === activeRequestIndex;
-                          const isExpanded = idx === expandedIndex;
-
-                          return (
-                            <div
-                              key={idx}
-                              onClick={() => setExpandedIndex(idx)}
-                              className={`
-      cursor-pointer border rounded p-3
-      ${isActive ? "border-l-4 border-red-500 bg-blue-50" : "border-gray-200 bg-white"}
-      transition-colors
-    `}
-                            >
-                              {/* ─── Header Row ───────────────────────────────────────── */}
-                              <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  {isActive && <FaChevronRight className="text-blue-500" />}
-                                  <span className="font-medium">
-                                    Change: {req.role} permission
-                                  </span>
-                                </div>
-                                {
-                                  pending && activeRequestIndex === idx
-                                  ?
-                                  <span className={`
-                                    px-2 py-1 rounded-full text-xs
-                                    ${
-                                      "bg-yellow-100 text-yellow-800" 
-                                      }
-                                  `}>
-                                    {"PENDING"}
-                                  </span> 
-                                  :
-                                  req.deleteStatus
-                                  ?
-                                  <span className={`
-                                    px-2 py-1 rounded-full text-xs
-                                    ${req.deleteStatus === "DRAFT" ? "bg-gray-200 text-gray-800" :
-                                        req.deleteStatus === "APPROVED" ? "bg-green-100 text-green-800" :
-                                          "bg-blue-100 text-blue-800"}
-                                  `}>
-                                    {req.deleteStatus}
-                                  </span>
-                                  :
-                                  <span className={`
-                                    px-2 py-1 rounded-full text-xs
-                                    ${req.status === "DRAFT" ? "bg-gray-200 text-gray-800" :
-                                        req.status === "APPROVED" ? "bg-green-100 text-green-800" :
-                                          "bg-blue-100 text-blue-800"}
-                                  `}>
-                                    {req.status}
-                                  </span>
-                                }
-                              </div>
-
-                              {/* ─── Expanded Content ─────────────────────────────────── */}
-                              {isExpanded && (
-                                isActive
-                                  ? <div className="mt-2">
-                                    <QuorumDashboard
-                                      request={req}
-                                      onCommit={async () => await addCommit(req)}
-                                    />
-                                  </div>
-                                  : <pre className="mt-2 bg-gray-50 border text-sm rounded p-4 overflow-auto">
-                                    {req.userRecord[0].accessDraft}
-                                  </pre>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
                   )}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+
+                <div className="pl-6 mt-2">
+                  <button
+                    onClick={() => setShowBackendDetails(prev => !prev)}
+                    className="flex items-center gap-2 text-gray-400 hover:text-gray-500 text-sm transition"
+                  >
+                    <span>View TideCloak Backend</span>
+                    <FaChevronDown
+                      className={`transform transition-transform duration-300 ${showBackendDetails ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  <div className="mt-2">
+                    <AccordionBox title="TideCloak Administration" isOpen={showBackendDetails}>
+                      <p className="mb-4">Check out the backend of TideCloak, your fully fledged IAM system.</p>
+                      <div className="border border-dashed border-gray-500 p-4">
+                        <ul className="list-disc list-inside">
+                          <li>
+                        Visit: <a href={adminAddress} className="text-blue-600">{adminAddress}</a>
+                      </li>
+                      <li>Use Credentials: admin / password</li>
+                    </ul>
+                  </div>
+                  </AccordionBox>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+
         </div>
         <div className="h-10"></div>
-        </main>
-        : <LoadingSquareFullPage/>
-    )
+      </main>
+      : loadingSquareFullPage()
+  );
 }
