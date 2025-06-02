@@ -486,7 +486,7 @@ export default function Admin() {
 
   const addCommit = async (request) => {
       setLoadingButton(true);
-      //setLoadingOverlay(true);
+      
       try{
 
         const token = await IAMService.getToken();
@@ -523,10 +523,10 @@ export default function Admin() {
             setExpandedIndex(prev => prev + 1);
           }
         }
-        //setLoadingOverlay(false);
+        
         setLoadingButton(false);
       }catch(e){
-        //setLoadingOverlay(false);
+    
         setLoadingButton(false);
         throw e;
       }

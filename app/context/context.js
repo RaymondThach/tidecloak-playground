@@ -16,6 +16,7 @@ const Context = createContext();
 export const Provider = ({ children }) => {
   const [authenticated, setAuthenticated] = useState(false);
   const [contextLoading, setContextLoading] = useState(true);
+  const [overlayLoading, setOverlayLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [baseURL, setBaseURL] = useState("");
   const realm = settings.realm;
@@ -51,6 +52,8 @@ export const Provider = ({ children }) => {
         baseURL,
         authenticated,
         contextLoading,
+        overlayLoading, 
+        setOverlayLoading,
         setIsInitialized
       }}
     >
