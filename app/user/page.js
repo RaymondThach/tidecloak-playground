@@ -51,8 +51,6 @@ export default function User(){
     // Encrypted Credit Card from database to decrypted in databaseExposureTable
     const [encryptedCc, setEncryptedCc] = useState("");
 
-    // Show the data all at once (double loading);
-    const [pageLoaded, setPageLoaded] = useState(false);
 
     // Runs first, once context verifies user is authenticated populate all users' demo data
     useEffect(() => {
@@ -80,7 +78,7 @@ export default function User(){
       // This is for the Accordion - it shows data directly from the database as is, not from id token.
       const token = await IAMService.getToken(); 
       const users = await appService.getUsers(baseURL, realm, token);
-      const loggedVuid =  await IAMService.getValueFromToken("vuid");
+      const loggedVuid =  IAMService.getValueFromToken("vuid");
       const loggedInUser = users.find(user => {
         if (user.attributes?.vuid[0] === loggedVuid){
             return user;
@@ -89,8 +87,8 @@ export default function User(){
       setLoggedUser(loggedInUser);
 
       // Use the encrypted DoB and CC from the identity token for this Users Page
-      setTokenDoB(await IAMService.getDoB());
-      setTokenCC(await IAMService.getCC());
+      setTokenDoB(IAMService.getDoB());
+      setTokenCC(IAMService.getCC());
     };
 
     // Decrypt the logged in user's data
@@ -148,7 +146,7 @@ export default function User(){
                 setEncryptedCc(loggedUser.attributes.cc[0]); 
               }
             }
-            setPageLoaded(true);
+            setOverlayLoading(false);
 
           } catch (error){
             // This catch is currently implemented for this demo's purposes
@@ -213,7 +211,7 @@ export default function User(){
 
             console.log(error); 
 
-            setPageLoaded(true);
+            setOverlayLoading(false);
           }
       } 
     };
@@ -303,12 +301,9 @@ export default function User(){
           console.log(error);
         } 
     };
+    
 
     return (
-      !contextLoading && !overlayLoading
-      ?
-      pageLoaded
-      ?
         <main className="flex-grow w-full pt-6 pb-16">
         <div className="w-full px-8 max-w-screen-md mx-auto flex flex-col items-start gap-8">
         <div className="w-full max-w-3xl">
@@ -499,7 +494,5 @@ export default function User(){
         </div>
         <div className="h-10"></div>
         </main>
-      : <LoadingSquareFullPage/>
-      :<LoadingSquareFullPage/>
     )
 };

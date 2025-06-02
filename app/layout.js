@@ -1,17 +1,17 @@
 // app/layout.js
 import "./styles/tailwind.css";
-import "./styles/spinKit.css"; 
-import "./styles/loading.css"
+import "./styles/spinKit.css";
+import "./styles/loading.css";
 import { Provider } from "./context/context";
 import Nav from "./components/nav";
 import Footer from "./components/footer";
 import ClientProviders from "./components/ClientProvider";
 
 export const metadata = {
-  title: 'TideCloak Demo',
-  description: 'The TideCloak Next.js Demo',
-  authors: [{ name: 'TideCloak' }],
-  robots: 'index, follow',
+  title: "TideCloak Demo",
+  description: "The TideCloak Next.js Demo",
+  authors: [{ name: "TideCloak" }],
+  robots: "index, follow",
 };
 
 /**
@@ -23,7 +23,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="min-h-screen flex flex-col bg-white">
+        <Provider>
           <ClientProviders>{children}</ClientProviders>
+        </Provider>
       </body>
     </html>
   );

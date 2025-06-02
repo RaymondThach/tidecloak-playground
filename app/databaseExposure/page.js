@@ -211,8 +211,6 @@ export default function DatabaseExposure() {
     };
 
     return (
-        !contextLoading && !overlayLoading
-        ?
         <main className="flex-grow w-full pt-6 pb-16">
         <div className="w-full px-8 max-w-screen-md mx-auto flex flex-col items-start gap-8">
         <div className="w-full max-w-3xl"/>
@@ -295,6 +293,5 @@ export default function DatabaseExposure() {
         </div>
         <div className="h-10"/>
         </main>
-        : <LoadingSquareFullPage/>
     );
 }

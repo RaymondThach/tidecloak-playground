@@ -48,10 +48,6 @@ export default function RedirectPage() {
     }       
   }, [contextLoading]);
 
-  if (contextLoading){
-    return <LoadingSquareFullPage/>
-  }
-
   return;
 }
 

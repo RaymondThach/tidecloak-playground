@@ -6,7 +6,7 @@ import AccordionBox from './components/accordionBox';
 import Button from './components/button';
 import LoadingPage from './components/LoadingPage';
 import EmailInvitation from './components/emailInvitation';
-import { LoadingSquareFullPage } from './components/loadingSquare';
+// import { LoadingSquareFullPage } from './components/loadingSquare';
 import {
   FaExclamationCircle,
   FaChevronDown,
@@ -23,7 +23,7 @@ import appService from '../lib/appService';
  * - kcData === {}        → empty config → show initializer
  * - kcData is object    → valid config → proceed
  */
-function useTideConfig(authenticated) {
+function useTideConfig(authenticated, setOverlayLoading) {
   const [kcData, setKcData] = useState(undefined);
   const [isInitializing, setIsInitializing] = useState(false);
 
@@ -123,7 +123,7 @@ function useTideLink(baseURL) {
 
 export default function Login() {
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, overlayLoading, setIsInitialized } = useAppContext();
+  const { authenticated, baseURL, overlayLoading, setIsInitialized, setOverlayLoading } = useAppContext();
 
   // Config and initialization hook
   const { kcData, isInitializing, setKcData, setIsInitializing } = useTideConfig(authenticated);
@@ -186,7 +186,8 @@ export default function Login() {
 
   // 1) Still fetching config
   if (kcData === undefined) {
-    return <LoadingSquareFullPage />;
+    setOverlayLoading(true);
+    return;
   }
 
   // 2) Config empty → show initializer (LoadingPage will call setIsInitialized)
@@ -204,11 +205,6 @@ export default function Login() {
   // 3) Demo user needs to link account
   if (!isLinked && !overlayLoading) {
     return <EmailInvitation inviteLink={inviteLink} />;
-  }
-
-  // 4) Context overlay still loading
-  if (overlayLoading) {
-    return <LoadingSquareFullPage />;
   }
 
   // ── MAIN LOGIN UI ──

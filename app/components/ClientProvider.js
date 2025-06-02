@@ -2,7 +2,7 @@
 "use client";
 
 import { useAppContext } from "../context/context";
-import LoadingSquareFullPage from "./LoadingSquareFullPage";
+import {LoadingSquareFullPage} from "./loadingSquare";
 import Nav from "./nav";
 import Footer from "./footer";
 
