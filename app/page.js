@@ -12,8 +12,8 @@ import {
   FaChevronDown,
   FaCheckCircle,
 } from 'react-icons/fa';
-import { useAppContext } from './context/context';
-import IAMService from '../lib/IAMService';
+// import { useAppContext } from './context/context';
+import { useTideCloak } from '@tidecloak/nextjs';
 import appService from '../lib/appService';
 
 /**
@@ -129,10 +129,10 @@ export default function Login() {
   const [overlayLoading, setOverlayLoading] = useState(true);
 
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, setIsInitialized} = useAppContext();
-
+  const { authenticated, baseURL, getConfig, login} = useTideCloak();
+  const kcData = getConfig();
+  
   // Config and initialization hook
-  const { kcData, isInitializing, setKcData, setIsInitializing } = useTideConfig(authenticated);
 
   // Invite/link hook
   const { isLinked, inviteLink, showLinkedMsg } = useTideLink(baseURL, setOverlayLoading);
@@ -182,7 +182,7 @@ export default function Login() {
       if (res.ok && data.inviteURL) {
         router.push(data.inviteURL);
       } else {
-        IAMService.doLogin();
+        login();
       }
     } catch (err) {
       console.error('[Login] handleLogin error:', err);
@@ -196,18 +196,18 @@ export default function Login() {
     return <LoadingSquareFullPage />;
   }
 
-  // 2) Config empty → show initializer (LoadingPage will call setIsInitialized)
-  if (isInitializing) {
-    return (
-      <LoadingPage
-        isInitializing={isInitializing}
-        setIsInitializing={setIsInitializing}
-        setKcData={setKcData}
-        setIsInitialized={setIsInitialized}
-        setOverlayLoading ={setOverlayLoading}
-      />
-    );
-  }
+  // // 2) Config empty → show initializer (LoadingPage will call setIsInitialized)
+  // if (isInitializing) {
+  //   return (
+  //     <LoadingPage
+  //       isInitializing={isInitializing}
+  //       setIsInitializing={setIsInitializing}
+  //       setKcData={setKcData}
+  //       setIsInitialized={setIsInitialized}
+  //       setOverlayLoading ={setOverlayLoading}
+  //     />
+  //   );
+  // }
 
   // 3) Demo user needs to link account
   if (!isLinked && !overlayLoading) {

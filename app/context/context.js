@@ -3,7 +3,9 @@
 import { createContext, useContext, useState, useEffect } from "react";
 // Instead of tidecloak.json as writing to that configuration file rerenders the whole application.
 import settings from "/tidecloak-demo-realm.json";
-import IAMService from "../../lib/IAMService";
+import { TideCloakProvider } from "@tidecloak/nextjs";
+import LoadingPage from "../components/LoadingPage";
+import { LoadingSquareFullPage } from "../components/loadingSquare";
 
 // Create once, share, and  avoid creating on each rerender. 
 const Context = createContext();
@@ -14,49 +16,55 @@ const Context = createContext();
  * @returns {JSX.Element} - HTML, wrapped around everything in layout.js
  */
 export const Provider = ({ children }) => {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [contextLoading, setContextLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [baseURL, setBaseURL] = useState("");
-  const realm = settings.realm;
+  const [config, setConfig] = useState(null)
+  useEffect(()=>{
+    console.log(config)
+  },[config])
 
-  const initContext = async () => {
-    try {
-      const adapter = await IAMService.loadConfig();
-      if(!adapter) return;
 
-      if (adapter?.["auth-server-url"]) {
-        setBaseURL(adapter["auth-server-url"].replace(/\/$/, ""));
-      }
-
-      // 2) Run the SSO check
-      IAMService.initIAM(auth => {
-        setAuthenticated(auth);
-        setContextLoading(false);
-      });
-    } catch (err) {
-      console.error("Failed to initialize app context:", err);
-      setContextLoading(false);
+    useEffect(() => {
+    const doStuff = async () => {
+        const res = await fetch('/api/tidecloakConfig');
+        const data = await res.json();
+        setConfig(data);
     }
-  };
-
-  useEffect(() => {
-    initContext();   
+    if (!config || Object.keys(config).length === 0 ) {
+      doStuff();
+    }
   }, [isInitialized]);
 
-  return (
-    <Context.Provider
-      value={{
-        realm,
-        baseURL,
-        authenticated,
-        contextLoading,
-        setIsInitialized
-      }}
-    >
-      {children}
-    </Context.Provider>
-  );
+
+
+  if ( config && Object.keys(config).length > 0){
+    return (
+      <TideCloakProvider config={config}
+                value={{
+            setIsInitialized
+          }}
+      >
+        {children}
+      </TideCloakProvider>
+    )
+  }
+
+  if (!config || Object.keys(config).length === 0) {
+
+    return (
+      <Context.Provider
+        value={{
+          setIsInitialized
+        }}
+      >
+      <LoadingPage
+        setKcData={setConfig}
+        setIsInitialized={setIsInitialized}
+      />
+      </Context.Provider>
+    );
+  }
+  return <overlayLoading/>
+
 };
 
 // Custom hook to call shared values in components
