@@ -1,8 +1,6 @@
 "use client"
 
-import IAMService from "../../lib/IAMService";
 import { useState, useEffect } from "react";
-import { useAppContext } from "../context/context";
 import appService from "../../lib/appService";
 import { usePathname } from "next/navigation";
 import AccordionBox from "../components/accordionBox";
@@ -10,6 +8,7 @@ import Button from "../components/button";
 import { LoadingSquareFullPage } from "../components/loadingSquare";
 import "../styles/spinKit.css";
 import "../styles/spinner.css";
+import { useTideCloak } from "@tidecloak/nextjs";
 
 /**
  * Page containing read and write functionality of user data (on top) and the decryption component (below).
@@ -21,7 +20,10 @@ export default function User(){
     const pathname = usePathname();
 
     // Shared data across the application
-    const {baseURL, realm, authenticated, contextLoading} = useAppContext();
+    const {baseURL, getConfig, authenticated, isInitializing, hasRealmRole, doDecrypt, doEncrypt, forceRefreshToken, token, getValueFromIdToken, getValueFromToken} = useTideCloak();
+    
+    const config = getConfig();
+    const realm = config.realm;
 
     // Logged in user object
     const [loggedUser, setLoggedUser] = useState(null);
@@ -46,8 +48,8 @@ export default function User(){
 
     // Data values for user information component
     const [formData, setFormData] = useState({
-        dob: "",
-        cc: ""
+        dob: getValueFromIdToken("dob"),
+        cc: getValueFromIdToken("cc")
     });
 
     // Encrypted Date of Birth from database to decrypted in databaseExposureTable
@@ -58,14 +60,14 @@ export default function User(){
 
     // Only show overlay when context is loading
     useEffect(() => {
-      if (contextLoading){
+      if (isInitializing){
         setOverlayLoading(true);
       }
     }, [])
 
     // Runs first, once context verifies user is authenticated populate all users' demo data
     useEffect(() => {
-      if (!contextLoading){
+      if (!isInitializing){
         if (authenticated){
           getAllUsers();
         }
@@ -74,7 +76,7 @@ export default function User(){
 
     // Runs second, perform only when the context receives the logged user details to decrypt
     useEffect(() => {
-      if (loggedUser && !contextLoading){
+      if (loggedUser && !isInitializing){
         getUserData();
       }
     }, [loggedUser])
@@ -89,9 +91,8 @@ export default function User(){
       setDataLoading(true);
 
       // This is for the Accordion - it shows data directly from the database as is, not from id token.
-      const token = await IAMService.getToken(); 
       const users = await appService.getUsers(baseURL, realm, token);
-      const loggedVuid =  IAMService.getValueFromToken("vuid");
+      const loggedVuid =  getValueFromToken("vuid");
       const loggedInUser = users.find(user => {
         if (user.attributes?.vuid[0] === loggedVuid){
             return user;
@@ -100,8 +101,11 @@ export default function User(){
       setLoggedUser(loggedInUser);
 
       // Use the encrypted DoB and CC from the identity token for this Users Page
-      setTokenDoB(IAMService.getDoB());
-      setTokenCC(IAMService.getCC());
+      console.log("HEREEREWRER")
+      const test = getValueFromIdToken("cc")
+      console.log(test)
+      setTokenDoB(getValueFromIdToken("dob"));
+      setTokenCC(test);
     };
 
     // Decrypt the logged in user's data
@@ -112,7 +116,7 @@ export default function User(){
             let arrayToDecrypt = [];
 
             // Date of Birth
-            if (tokenDoB && IAMService.hasOneRole("_tide_dob.selfdecrypt")){
+            if (tokenDoB && hasRealmRole("_tide_dob.selfdecrypt")){
               arrayToDecrypt.push({
                 "encrypted": tokenDoB,
                 "tags": ["dob"]
@@ -120,7 +124,7 @@ export default function User(){
             }
 
             // Credit Card
-            if (tokenCC && IAMService.hasOneRole("_tide_cc.selfdecrypt")){
+            if (tokenCC && hasRealmRole("_tide_cc.selfdecrypt")){
                arrayToDecrypt.push({
                 "encrypted": tokenCC,
                 "tags": ["cc"]
@@ -132,7 +136,7 @@ export default function User(){
             }
 
             if (arrayToDecrypt.length > 0){
-              const decryptedData = await IAMService.doDecrypt(arrayToDecrypt);
+              const decryptedData = await doDecrypt(arrayToDecrypt);
               
               if (arrayToDecrypt.length === 2){
                 // User Information
@@ -151,6 +155,7 @@ export default function User(){
                 setEncryptedCc(loggedUser.attributes.cc[0]); 
               }
               else { 
+
                 // User Information
                 setFormData(prev => ({...prev, dob: tokenDoB}));
                 setFormData(prev => ({...prev, cc: decryptedData[0]}));
@@ -187,7 +192,7 @@ export default function User(){
 
             let arrayToEncrypt = [];
 
-            if (formData.dob !== "" && IAMService.hasOneRole("_tide_dob.selfencrypt")){ 
+            if (formData.dob !== "" && hasRealmRole("_tide_dob.selfencrypt")){ 
               if (loggedUser.attributes.dob){
                 if (/[a-zA-Z]/.test(formData.dob)){
                   console.log("DoB can't have letters. Don't encrypt as it may already be encrypted.");
@@ -201,7 +206,7 @@ export default function User(){
               }
             }
 
-            if (formData.cc !== "" && IAMService.hasOneRole("_tide_cc.selfencrypt")){
+            if (formData.cc !== "" && hasRealmRole("_tide_cc.selfencrypt")){
               if (loggedUser.attributes.cc){
                 if (/[a-zA-Z]/.test(formData.cc)){
                   console.log("CC can't have letters. Don't encrypt as it may already be encrypted.");
@@ -216,7 +221,7 @@ export default function User(){
             }
 
             if (arrayToEncrypt.length > 0){
-              const encryptedData = await IAMService.doEncrypt(arrayToEncrypt);
+              const encryptedData = await doEncrypt(arrayToEncrypt);
               if (arrayToEncrypt.length === 2){
                 setEncryptedDob(encryptedData[0]);
                 setEncryptedCc(encryptedData[1]); 
@@ -237,10 +242,9 @@ export default function User(){
             }
 
             // Store the data
-            const token = await IAMService.getToken();
             const response = await appService.updateUser(baseURL, realm, loggedUser, token);
             // Updating the access token should also update the ID token
-            await IAMService.updateToken();
+            await forceRefreshToken();
 
             // Show the confirmation message
             if (response.ok){
@@ -258,7 +262,7 @@ export default function User(){
     };
 
     return (
-  (contextLoading || overlayLoading || dataLoading)
+  (isInitializing || overlayLoading || dataLoading)
     ? (
       <LoadingSquareFullPage />
     )
@@ -307,10 +311,10 @@ export default function User(){
 
                 <h2 className="text-3xl font-bold mb-4">User Information</h2>
                 {(
-                  !IAMService.hasOneRole("_tide_dob.selfdecrypt") &&
-                  !IAMService.hasOneRole("_tide_dob.selfencrypt") &&
-                  !IAMService.hasOneRole("_tide_cc.selfdecrypt") &&
-                  !IAMService.hasOneRole("_tide_cc.selfencrypt")
+                  !hasRealmRole("_tide_dob.selfdecrypt") &&
+                  !hasRealmRole("_tide_dob.selfencrypt") &&
+                  !hasRealmRole("_tide_cc.selfdecrypt") &&
+                  !hasRealmRole("_tide_cc.selfencrypt")
                 ) ? (
                   <p className="text-sm text-gray-600 mb-6">
                     No roles, no data - exactly as designed. The Fabric refuses to reveal or accept fields you're not entitled to touch.
@@ -321,8 +325,8 @@ export default function User(){
 
                 <form className="space-y-6" onSubmit={handleFormSubmit}>
                   {["dob", "cc"].map((field, i) => {
-                    const readPerms = IAMService.hasOneRole(field === "dob" ? "_tide_dob.selfdecrypt" : "_tide_cc.selfdecrypt");
-                    const writePerms = IAMService.hasOneRole(field === "dob" ? "_tide_dob.selfencrypt" : "_tide_cc.selfencrypt");
+                    const readPerms = hasRealmRole(field === "dob" ? "_tide_dob.selfdecrypt" : "_tide_cc.selfdecrypt");
+                    const writePerms = hasRealmRole(field === "dob" ? "_tide_dob.selfencrypt" : "_tide_cc.selfencrypt");
                     const canRead = !!readPerms;
                     const canWrite = !!writePerms;
                     const label = field === "dob" ? "Date of Birth" : "Credit Card Number";
@@ -443,7 +447,7 @@ export default function User(){
                     );
                   })}
 
-                  {(IAMService.hasOneRole("_tide_dob.selfencrypt") || IAMService.hasOneRole("_tide_cc.selfencrypt")) && (
+                  {(hasRealmRole("_tide_dob.selfencrypt") || hasRealmRole("_tide_cc.selfencrypt")) && (
                     <div className="flex items-center gap-3">
                       <Button className="hover:bg-red-700" type="submit" disabled={loadingButton}>
                         Save Changes

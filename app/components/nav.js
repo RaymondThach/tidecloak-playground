@@ -1,14 +1,15 @@
 "use client"; 
 
-import IAMService from "../../lib/IAMService";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";              // NEW
 import Button from "../components/button";
+import { useTideCloak } from "@tidecloak/nextjs";
 
 /**
  * Top navigation bar shown after login.
  */
 export default function Nav() {
+  const { logout } = useTideCloak();
   const pathname = usePathname();
   const router   = useRouter();
 
@@ -56,7 +57,7 @@ export default function Nav() {
         Administration
       </button>
 
-      <Button onClick={() => IAMService.doLogout()}>Logout</Button>
+      <Button onClick={() => logout()}>Logout</Button>
     </nav>
   );
 }

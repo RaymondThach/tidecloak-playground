@@ -2,8 +2,6 @@
 
 import { useEffect } from "react";
 
-import { useAppContext } from "../../context/context";
-
 import { useRouter } from "next/navigation";
 
 import { LoadingSquareFullPage } from "../../components/loadingSquare";
@@ -16,51 +14,50 @@ import { useTideCloak } from "@tidecloak/nextjs";
  */
 export default function RedirectPage() {
 
-
-
-  const { baseURL, realm, authenticated, isInitializing, token, getValueFromIdToken, getValueFromToken, doEncrypt, doDecrypt, refreshToken, logout } = useTideCloak();
+  const { baseURL, authenticated, isInitializing, getValueFromIdToken, getValueFromToken, doEncrypt, forceRefreshToken, logout, getConfig, token } = useTideCloak();
 
   const router = useRouter();
-  
+
+  const realm = getConfig().realm;
+
   const startUserInfoEncryption = async () => {
-  const token = token;
-  const loggedVuid = getValueFromToken("vuid");
-  const user = await appService.getUserByVuid(baseURL, realm, token, loggedVuid);
-  const tokenDoB = getValueFromIdToken("dob");
-  const tokenCC = getValueFromIdToken("cc");
+    const loggedVuid = getValueFromToken("vuid");
+    const user = await appService.getUserByVuid(baseURL, realm, token, loggedVuid);
+    const tokenDoB = getValueFromToken("dob");
+    const tokenCC = getValueFromToken("cc");
 
-  let arrayToEncrypt = [];
+    let arrayToEncrypt = [];
 
-  if (tokenDoB) {
-    if (/[a-zA-Z]/.test(tokenDoB) === false) {
-      arrayToEncrypt.push({
-        "data": tokenDoB,
-        "tags": ["dob"]
-      })
+    if (tokenDoB) {
+      if (/[a-zA-Z]/.test(tokenDoB) === false) {
+        arrayToEncrypt.push({
+          "data": tokenDoB,
+          "tags": ["dob"]
+        })
+      }
     }
-  }
 
-  // Credit Card
-  if (tokenCC) {
-    if (/[a-zA-Z]/.test(tokenCC) === false) {
-      arrayToEncrypt.push({
-        "data": tokenCC,
-        "tags": ["cc"]
-      })
+    // Credit Card
+    if (tokenCC) {
+      if (/[a-zA-Z]/.test(tokenCC) === false) {
+        arrayToEncrypt.push({
+          "data": tokenCC,
+          "tags": ["cc"]
+        })
+      }
     }
-  }
 
-  if (arrayToEncrypt.length > 0) {
-    // Encrypt the data for the first time
-    const encryptedData = await doEncrypt(arrayToEncrypt);
-    // Save the updated user object to TideCloak;
-    user[0].attributes.dob = encryptedData[0];
-    user[0].attributes.cc = encryptedData[1];
-    const response = await appService.updateUser(baseURL, realm, user[0], token);
-    await refreshToken();
-  }
+    if (arrayToEncrypt.length > 0) {
+      // Encrypt the data for the first time
+      const encryptedData = await doEncrypt(arrayToEncrypt);
+      // Save the updated user object to TideCloak;
+      user[0].attributes.dob = encryptedData[0];
+      user[0].attributes.cc = encryptedData[1];
+      const response = await appService.updateUser(baseURL, realm, user[0], token);
+      await forceRefreshToken();
+    }
 
-}
+  }
 
   // Handles redirect when middle detects token expiry
   useEffect(() => {

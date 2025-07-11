@@ -1,71 +1,65 @@
-"use client"
-
-import { createContext, useContext, useState, useEffect } from "react";
-// Instead of tidecloak.json as writing to that configuration file rerenders the whole application.
-import settings from "/tidecloak-demo-realm.json";
+'use client'
+import { useState, useEffect } from "react";
 import { TideCloakProvider } from "@tidecloak/nextjs";
 import LoadingPage from "../components/LoadingPage";
 import { LoadingSquareFullPage } from "../components/loadingSquare";
 
-// Create once, share, and  avoid creating on each rerender. 
-const Context = createContext();
+export function Provider({ children }) {
+    const [isInitializing, setIsInitializing] = useState(null);
+    const [overlayLoading, setOverlayLoading] = useState(true);
+    const [config, setConfig] = useState(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
-/**
- * Updating baseURL and realm name for all pages and components is done here.
- * @param {JSX.Element} children - all other child components, so that they can access these values 
- * @returns {JSX.Element} - HTML, wrapped around everything in layout.js
- */
-export const Provider = ({ children }) => {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [config, setConfig] = useState(null)
-  useEffect(()=>{
-    console.log(config)
-  },[config])
+    useEffect(() => {
+        console.log(overlayLoading)
+    }, [overlayLoading])
 
 
     useEffect(() => {
-    const doStuff = async () => {
-        const res = await fetch('/api/tidecloakConfig');
-        const data = await res.json();
-        setConfig(data);
+        if (config !== null) return;
+
+        fetch("/api/tidecloakConfig")
+            .then(res => res.json())
+            .then(data => {
+                setConfig(data)
+            })
+            .catch(console.error);
+    }, [isInitialized, config]);
+
+    useEffect(() => {
+        if (isInitializing === false || config === null) return;
+
+        const hasData =
+            config !== null &&
+            typeof config === "object" &&
+            Object.keys(config).length > 0;
+
+        if (hasData) {
+            setIsInitializing(false);
+            setOverlayLoading(false);
+        }else {
+            setIsInitializing(true)
+        }
+    }, [config, isInitializing]);
+
+    if (setIsInitializing !== null && isInitializing) {
+        return (
+            <LoadingPage
+                isInitializing={isInitializing}
+                setIsInitializing={setIsInitializing}
+                setOverlayLoading={setOverlayLoading}
+                setIsInitialized={setIsInitialized}
+            />
+        );
     }
-    if (!config || Object.keys(config).length === 0 ) {
-      doStuff();
+
+    if (overlayLoading) {
+        return <LoadingSquareFullPage />;
     }
-  }, [isInitialized]);
-
-
-
-  if ( config && Object.keys(config).length > 0){
-    return (
-      <TideCloakProvider config={config}
-                value={{
-            setIsInitialized
-          }}
-      >
-        {children}
-      </TideCloakProvider>
-    )
-  }
-
-  if (!config || Object.keys(config).length === 0) {
 
     return (
-      <Context.Provider
-        value={{
-          setIsInitialized
-        }}
-      >
-      <LoadingPage
-        setKcData={setConfig}
-        setIsInitialized={setIsInitialized}
-      />
-      </Context.Provider>
+        <TideCloakProvider config={config}>
+            {children}
+        </TideCloakProvider>
     );
-  }
-  return <overlayLoading/>
-
-};
-
-// Custom hook to call shared values in components
-export const useAppContext = () => useContext(Context);
+}

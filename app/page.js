@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import AccordionBox from './components/accordionBox';
 import Button from './components/button';
-import LoadingPage from './components/LoadingPage';
 import EmailInvitation from './components/emailInvitation';
 import { LoadingSquareFullPage } from './components/loadingSquare';
 import {
@@ -12,7 +11,6 @@ import {
   FaChevronDown,
   FaCheckCircle,
 } from 'react-icons/fa';
-// import { useAppContext } from './context/context';
 import { useTideCloak } from '@tidecloak/nextjs';
 import appService from '../lib/appService';
 

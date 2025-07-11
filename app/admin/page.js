@@ -21,7 +21,9 @@ export default function Admin() {
   // Navigator
   const router = useRouter();
   // Shared context data
-  const { baseURL, getConfig, authenticated, isInitializing, token, getValueFromIdToken, getValueFromToken, doEncrypt, doDecrypt, hasRealmRole, refreshToken } = useTideCloak();
+  const { baseURL, getConfig, authenticated, isInitializing, token, getValueFromIdToken, getValueFromToken, doEncrypt, doDecrypt, hasRealmRole, forceRefreshToken } = useTideCloak();
+
+  const realm = getConfig().realm;
   // Admin state of the logged in demo user
   const [isTideAdmin, setIsTideAdmin] = useState(false);
   // Object representation of the logged in user
@@ -83,10 +85,10 @@ export default function Admin() {
 
   // Wait for context to load first when refreshing browser or similar destruction of context
   useEffect(() => {
-    if (!contextLoading){
+    if (!isInitializing){
       getRealmRoles();
     }
-  }, [contextLoading])
+  }, [isInitializing])
 
   // For demo purposes, fetched stored or store data of admins who have approved locally
   useEffect(() => {
@@ -186,7 +188,7 @@ export default function Admin() {
         if (response.ok) {
             // Force update of token without logging out
            
-            await refreshToken();
+            await forceRefreshToken();
             setIsTideAdmin(true); 
            
             console.log("Admin Role Assigned");
@@ -499,7 +501,7 @@ export default function Admin() {
           localStorage.removeItem("approvals");
           
           // Get a new token to have check the currently assigned roles to the logged in user
-          await refreshToken();
+          await forceRefreshToken();
 
           
           // Reset states for next change request

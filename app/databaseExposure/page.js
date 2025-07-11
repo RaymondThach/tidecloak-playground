@@ -1,13 +1,12 @@
 "use client";
-import IAMService from "../../lib/IAMService";
 import { useState, useEffect } from "react";
 import Button from "../components/button";
-import {useAppContext} from '../context/context'
 import appService from "../../lib/appService";
 import AccordionBox from "../components/accordionBox";
 import { LoadingSquareFullPage } from "../components/loadingSquare";
 import '../styles/spinKit.css';
 import "../styles/spinner.css";
+import { useTideCloak } from "@tidecloak/nextjs"
 
 // Animation only, so it looks cool, because the real magic is invisible.
 function DecryptingText({ text, speed = 30 }) {
@@ -46,6 +45,7 @@ function DecryptingText({ text, speed = 30 }) {
  * @returns {JSX.Element} - HTML for each card to be decrypted
  */
 function DecryptedRow({ isUser, user, username, dob, cc }) {
+    const { hasRealmRole, doDecrypt } = useTideCloak();
     // State variable for handling Decrypt Button
     const [decrypted, setDecrypted] = useState(false);
     // State variable for handling Decrypt Button's spinner
@@ -61,8 +61,8 @@ function DecryptedRow({ isUser, user, username, dob, cc }) {
     // If new user data arrives reset to potentially decrypt again
     useEffect(() => {
         setDecrypted(false);
-        setCanReadDob(IAMService.hasOneRole("_tide_dob.selfdecrypt"));
-        setCanReadCc(IAMService.hasOneRole("_tide_cc.selfdecrypt"));
+        setCanReadDob(hasRealmRole("_tide_dob.selfdecrypt"));
+        setCanReadCc(hasRealmRole("_tide_cc.selfdecrypt"));
     }, [user])
 
     // Calls on Decrypt button being selected to update the fields
@@ -103,7 +103,7 @@ function DecryptedRow({ isUser, user, username, dob, cc }) {
 
             if (encryptedData.length > 0){
                 setLoadingButton(true);
-                const decryptedData = await IAMService.doDecrypt(encryptedData);
+                const decryptedData = await doDecrypt(encryptedData);
                 // Set data to show at roughly same time, only decrypt the attributes user has read permissions to
                 if (encryptedData.length === 2){                // Yes DoB Read permission, Yes CC Read Permission
                     setDecryptedDob(decryptedData[0]); 
@@ -184,8 +184,7 @@ function DecryptedRow({ isUser, user, username, dob, cc }) {
  */
 export default function DatabaseExposure() {
     
-    const {baseURL, realm, contextLoading, overlayLoading} = useAppContext();
-
+    const {baseURL, isInitializing, getValueFromToken, token, getConfig } = useTideCloak();
     const [users, setUsers] = useState([]);
 
     // Expandable extra databaseExposureTable information
@@ -193,25 +192,27 @@ export default function DatabaseExposure() {
     // Further expandable information
     const [showDeepDive, setShowDeepDive] = useState(false);
 
+    const realm = getConfig().realm;
+
     // Show a loading screen when loading context (such as when refreshing browser) until finish
     // Fetch all user data when navigating
     useEffect(() => {
-        if (!contextLoading){
+        if (!isInitializing){
+            console.log(baseURL)
             getAllUsers();
         }
         
-    }, [contextLoading])
+    }, [isInitializing])
 
 
     // Populate the Database Exposure cards, and set the current logged users
     const getAllUsers = async () => {
-      const token = await IAMService.getToken(); 
       const users = await appService.getUsers(baseURL, realm, token);
       setUsers(users);
     };
 
     return (
-        !contextLoading && !overlayLoading
+        !isInitializing
         ?
         <main className="flex-grow w-full pt-6 pb-16">
         <div className="w-full px-4 max-w-screen-md mx-auto flex flex-col items-stretch gap-4">
@@ -293,21 +294,21 @@ export default function DatabaseExposure() {
             <div className="space-y-4">
                 {
                     // Let the data load first
-                    users.length > 0 && !contextLoading
+                    users.length > 0 && !isInitializing
                     ?
                     users.map((user, i) => (
                         
                     <DecryptedRow key={i}
                     isUser={user.attributes?.vuid
-                        ? user.attributes.vuid[0] === IAMService.getValueFromToken("vuid") ? true : false
+                        ? user.attributes.vuid[0] === getValueFromToken("vuid") ? true : false
                         : false}
                     user={user}
                     username={user.username}
                     dob={user.attributes?.vuid
-                        ? user.attributes.vuid[0] === IAMService.getValueFromToken("vuid") ? user.attributes.dob[0] : user.attributes.dob
+                        ? user.attributes.vuid[0] === getValueFromToken("vuid") ? user.attributes.dob[0] : user.attributes.dob
                         : user.attributes?.dob}
                     cc={user.attributes?.vuid
-                        ? user.attributes.vuid[0] === IAMService.getValueFromToken("vuid") ? user.attributes.cc[0] : user.attributes.cc
+                        ? user.attributes.vuid[0] === getValueFromToken("vuid") ? user.attributes.cc[0] : user.attributes.cc
                         : user.attributes?.cc}
                     />
                     ))
