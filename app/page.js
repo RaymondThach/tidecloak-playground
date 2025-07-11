@@ -127,8 +127,7 @@ export default function Login() {
   const [overlayLoading, setOverlayLoading] = useState(true);
 
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, getConfig, login} = useTideCloak();
-  const kcData = getConfig();
+  const { authenticated, baseURL, login, isInitializing} = useTideCloak();
   
   // Config and initialization hook
 
@@ -147,10 +146,10 @@ export default function Login() {
 
   // Redirect once we have real config and are authenticated
   useEffect(() => {
-    if (kcData && Object.keys(kcData).length > 0 && authenticated) {
+    if (!isInitializing && authenticated) {
       router.push('/auth/redirect');
     }
-  }, [kcData, authenticated, router]);
+  }, [isInitializing, authenticated, router]);
 
   // Token-expired banner and port check
   useEffect(() => {
