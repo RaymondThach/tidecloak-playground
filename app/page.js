@@ -127,7 +127,7 @@ export default function Login() {
   const [overlayLoading, setOverlayLoading] = useState(true);
 
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, login, isInitializing} = useTideCloak();
+  const { authenticated, baseURL, login, isInitializing, getConfig} = useTideCloak();
   
   // Config and initialization hook
 
@@ -139,6 +139,19 @@ export default function Login() {
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [showError, setShowError] = useState(false);
   const [portIsPublic, setPortIsPublic] = useState(null);
+  const [ kcData, setKcData ] = useState();
+
+  useEffect(() => {
+    const getTcConfig = async () => {
+      const adapter = getConfig();
+      setKcData(adapter);
+    }
+
+    if(!isInitializing){
+      getTcConfig();
+    }
+
+  }, [isInitializing])
 
 
   const router = useRouter();
