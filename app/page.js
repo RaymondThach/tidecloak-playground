@@ -127,7 +127,8 @@ export default function Login() {
   const [overlayLoading, setOverlayLoading] = useState(true);
 
   // App context (overlayLoading and re-init are handled in LoadingPage)
-  const { authenticated, baseURL, login, isInitializing, getConfig} = useTideCloak();
+  const { authenticated, baseURL, getConfig, login, isInitializing} = useTideCloak();
+  const kcData = getConfig();
   
   // Config and initialization hook
 
@@ -139,19 +140,6 @@ export default function Login() {
   const [showBackendDetails, setShowBackendDetails] = useState(false);
   const [showError, setShowError] = useState(false);
   const [portIsPublic, setPortIsPublic] = useState(null);
-  const [ kcData, setKcData ] = useState();
-
-  useEffect(() => {
-    const getTcConfig = async () => {
-      const adapter = getConfig();
-      setKcData(adapter);
-    }
-
-    if(!isInitializing){
-      getTcConfig();
-    }
-
-  }, [isInitializing])
 
 
   const router = useRouter();
@@ -169,7 +157,7 @@ export default function Login() {
     if (sessionStorage.getItem('tokenExpired')) {
       setShowError(true);
     }
-    if (baseURL && kcData && Object.keys(kcData).length > 0) {
+    if (baseURL && !isInitializing) {
       (async () => {
         try {
           const url = `${baseURL}/realms/master/.well-known/openid-configuration`;
@@ -202,7 +190,7 @@ export default function Login() {
   // ── EARLY RETURNS ──
 
   // 1) Still fetching config
-  if (kcData === undefined) {
+  if (isInitializing) {
     return <LoadingSquareFullPage />;
   }
 

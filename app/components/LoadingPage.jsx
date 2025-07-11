@@ -220,6 +220,7 @@ export default function LoadingPage({ isInitializing, setIsInitializing, setIsIn
             await uploadImages();
             await signSettings();
             await updateCustomDomainURL({ linkedTide: true });
+            await getAdapter();
 
             // Load out of the initializer first then stop it to prevent Login screen appearing and giving context time to load 
             setOverlayLoading(false);
