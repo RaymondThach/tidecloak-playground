@@ -1,7 +1,7 @@
 // app/layout.js
-import "./styles/tailwind.css";
+import './styles/generated.css';
 import "./styles/spinKit.css"; 
-import "./styles/loading.css"
+import "./styles/loading.css";
 import { Provider } from "./context/context";
 import Nav from "./components/nav";
 import Footer from "./components/footer";

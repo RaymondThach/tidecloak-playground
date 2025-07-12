@@ -15,52 +15,6 @@ import { useTideCloak } from '@tidecloak/nextjs';
 import appService from '../lib/appService';
 
 /**
- * Hook: load TideCloak config and track initialization state.
- *
- * - kcData === undefined → still fetching
- * - kcData === {}        → empty config → show initializer
- * - kcData is object    → valid config → proceed
- */
-function useTideConfig(authenticated) {
-  const [kcData, setKcData] = useState(undefined);
-  const [isInitializing, setIsInitializing] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchConfig() {
-      try {
-        const res = await fetch('/api/tidecloakConfig');
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (!data || Object.keys(data).length === 0) {
-          // Empty config → trigger initializer
-          setKcData({});
-          setIsInitializing(true);
-        } else {
-          // Got real config
-          setKcData(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[Login] Config load failed:', err);
-          setKcData({});
-          setIsInitializing(true);
-        }
-      }
-    }
-
-    fetchConfig();
-    return () => {
-      cancelled = true;
-    };
-  }, [authenticated]);
-
-  return { kcData, isInitializing, setKcData, setIsInitializing };
-}
-
-/**
  * Hook: demo invite/link flow.
  * - Detects ?linkedTide=true → shows success message
  * - Fetches /api/inviteUser to get invite URL or detect linked users
@@ -125,11 +79,19 @@ function useTideLink(baseURL, setOverlayLoading) {
 export default function Login() {
 
   const [overlayLoading, setOverlayLoading] = useState(true);
+  const [kcData, setKcData ] = useState()
 
   // App context (overlayLoading and re-init are handled in LoadingPage)
   const { authenticated, baseURL, getConfig, login, isInitializing} = useTideCloak();
-  const kcData = getConfig();
-  
+
+  useEffect(()  => {
+    if(!isInitializing){
+      const data = getConfig();
+      setKcData(data)
+    }
+  }, [isInitializing])
+
+
   // Config and initialization hook
 
   // Invite/link hook
@@ -168,7 +130,7 @@ export default function Login() {
         }
       })();
     }
-  }, [baseURL, kcData]);
+  }, [baseURL]);
 
   // Login / link handler
   const handleLogin = async () => {
@@ -189,36 +151,19 @@ export default function Login() {
 
   // ── EARLY RETURNS ──
 
-  // 1) Still fetching config
-  if (isInitializing) {
-    return <LoadingSquareFullPage />;
-  }
-
-  // // 2) Config empty → show initializer (LoadingPage will call setIsInitialized)
-  // if (isInitializing) {
-  //   return (
-  //     <LoadingPage
-  //       isInitializing={isInitializing}
-  //       setIsInitializing={setIsInitializing}
-  //       setKcData={setKcData}
-  //       setIsInitialized={setIsInitialized}
-  //       setOverlayLoading ={setOverlayLoading}
-  //     />
-  //   );
-  // }
-
   // 3) Demo user needs to link account
   if (!isLinked && !overlayLoading) {
     return <EmailInvitation inviteLink={inviteLink} />;
   }
 
-  // 4) Context overlay still loading
   if (overlayLoading) {
     return <LoadingSquareFullPage />;
   }
 
   // ── MAIN LOGIN UI ──
+
   const adminAddress = kcData['auth-server-url'] || 'Need to setup backend first.';
+
 
   return (
     <main className="flex-grow w-full pt-6 pb-16">

@@ -10,7 +10,7 @@ import { useAppContext } from "../context/context";
  * @param {function} setOverlayLoading - turn on loading screen when completed to load back to login screen
  * @returns {JSX.Element} - HTML component for the initializer screen 
  */
-export default function LoadingPage({ isInitializing, setIsInitializing, setIsInitialized, setOverlayLoading }) {
+export default function LoadingPage({ isInitializing, setIsInitializing, setIsInitialized, setOverlayLoading, setConfig }) {
 
     useEffect(() => {
         document.body.classList.add("no-scroll");
@@ -220,7 +220,8 @@ export default function LoadingPage({ isInitializing, setIsInitializing, setIsIn
             await uploadImages();
             await signSettings();
             await updateCustomDomainURL({ linkedTide: true });
-            await getAdapter();
+            const adapter = await getAdapter();
+            setConfig(JSON.parse(adapter))
 
             // Load out of the initializer first then stop it to prevent Login screen appearing and giving context time to load 
             setOverlayLoading(false);
