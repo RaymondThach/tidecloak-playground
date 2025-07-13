@@ -15,6 +15,8 @@ import { useTideCloak } from "@tidecloak/nextjs";
 export default function RedirectPage() {
 
   const {authenticated, isInitializing, logout } = useTideCloak();
+  const router = useRouter();
+
 
 
   // Handles redirect when middle detects token expiry
