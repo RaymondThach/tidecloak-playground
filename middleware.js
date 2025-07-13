@@ -24,7 +24,7 @@ function initConfig(requestUrl) {
 
 export async function middleware(req) {
   // ensure tcConfig is loaded (only on first request)
-  await initConfig(req.url);
+  await initConfig(process.env.SYSTEM_URL_OVERRIDE ?? "http://localhost:3000");
 
   // build a TideCloak handler with that cached tcConfig
   const handler = createTideCloakMiddleware({
